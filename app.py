@@ -1,215 +1,563 @@
+# app.py
+
 import streamlit as st
+import pandas as pd
 import numpy as np
 import numpy_financial as nf
-import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.express as px
+from io import BytesIO
+import tempfile
+
+# Try PDF support (optional)
+try:
+    import pdfkit
+    PDFKIT_AVAILABLE = True
+except Exception:
+    PDFKIT_AVAILABLE = False
 
 # ---------------------------------------------------------
-# PAGE SETTINGS
+# PAGE CONFIG
 # ---------------------------------------------------------
-st.set_page_config(
-    page_title="EdTech Financial Dashboard",
-    layout="wide",
-)
+st.set_page_config(page_title="EdTech Financial Intelligence Lab", layout="wide")
 
-st.title("📊 EdTech + Analytics Financial Intelligence Dashboard")
-st.write("A complete investor-ready financial analytics and valuation system.")
-
+# Hide default sidebar
+st.markdown("""
+<style>
+[data-testid="stSidebar"] {display:none;}
+[data-testid="stSidebarNav"] {display:none;}
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# SIDEBAR
+# BRANDING HEADER
 # ---------------------------------------------------------
-st.sidebar.title("🔧 App Controls")
+logo_url = "https://raw.githubusercontent.com/Analytics-Avenue/streamlit-dataapp/main/logo.png"
 
-section = st.sidebar.radio(
-    "Choose a Section",
-    ["Overview", "Key Metrics", "Investor Valuation Model", "5-Year Projection", "Market Trend"]
-)
+st.markdown(f"""
+<div style="display:flex; align-items:center; margin-bottom:16px;">
+    <img src="{logo_url}" width="60" style="margin-right:12px;">
+    <div style="line-height:1;">
+        <div style="color:#064b86; font-size:36px; font-weight:700;">Analytics Avenue</div>
+        <div style="color:#064b86; font-size:28px; font-weight:600;">Financial Intelligence Lab</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# GLOBAL CSS – same visual style as your reference app
+# ---------------------------------------------------------
+st.markdown("""
+<style>
+* { font-family:'Inter', sans-serif; }
+body, [class*="css"] { color:#000 !important; font-size:17px; }
+
+/* HEADERS */
+.big-header { font-size:36px; font-weight:700; color:#000; margin-bottom:14px; }
+.section-title {
+    font-size:24px; font-weight:600; margin-top:28px; margin-bottom:12px;
+    position:relative; color:#000;
+}
+.section-title:after {
+    content:""; position:absolute; bottom:-4px; left:0; height:2px; width:0%;
+    background:#064b86; transition:0.35s ease;
+}
+.section-title:hover:after { width:40%; }
+
+/* CARD */
+.card {
+    background:white; padding:20px; border-radius:14px; 
+    border:1px solid #e5e5e5; font-size:16.5px; font-weight:500;
+    box-shadow:0 3px 14px rgba(0,0,0,0.08);
+    transition:all 0.25s ease;
+}
+.card:hover {
+    transform:translateY(-4px);
+    box-shadow:0 12px 25px rgba(6,75,134,0.18);
+    border-color:#064b86;
+}
+
+/* KPI CARD */
+.kpi {
+    background:white; padding:22px; border-radius:14px;
+    border:1px solid #e2e2e2; font-size:20px; font-weight:600;
+    text-align:center; color:#064b86;
+    box-shadow:0 3px 14px rgba(0,0,0,0.07);
+    transition:0.25s ease;
+}
+.kpi:hover {
+    transform:translateY(-6px);
+    box-shadow:0 13px 26px rgba(6,75,134,0.20);
+}
+
+/* VARIABLE BOX */
+.variable-box {
+    padding:14px; border-radius:12px; background:#ffffff;
+    border:1px solid #e5e5e5; font-size:16px; font-weight:500;
+    color:#064b86; text-align:left;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06);
+    margin-bottom:8px;
+}
+
+/* Fade-in */
+.block-container { animation:fadeIn 0.4s ease; }
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("<div class='big-header'>EdTech Financial Intelligence Dashboard</div>", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# REQUIRED FIELDS FOR REVENUE DATASET
+# ---------------------------------------------------------
+REQUIRED_COLS = [
+    "first_payment_date",
+    "collected_amount",
+    "total_fee",
+    "joined_or_not",
+    "pay_status",
+    "campaign_name",
+    "lead_created_date",
+    "batch",
+    "pending_amount",
+    "co_assignee"
+]
+
+# ---------------------------------------------------------
+# TABS
+# ---------------------------------------------------------
+tab1, tab2, tab3 = st.tabs(["Overview", "Important Attributes", "Application"])
 
 # =========================================================
-# 1. OVERVIEW TAB
+# TAB 1 - OVERVIEW
 # =========================================================
-if section == "Overview":
-    st.header("📘 Application Overview")
-
+with tab1:
+    st.markdown("<div class='section-title'>Overview</div>", unsafe_allow_html=True)
     st.markdown("""
-    ### What this App Does
-    This dashboard gives a **complete financial intelligence system** for EdTech–Analytics hybrid organizations.
+    <div class="card">
+    This lab gives you a complete **financial and investor analytics cockpit** for your EdTech + Analytics business.
+    It connects actual revenue data with projections, growth analytics, investor outcome modeling, and market context.
+    </div>
+    """, unsafe_allow_html=True)
 
-    ### Features Included:
-    - Monthly, quarterly, annual revenue logic  
-    - Gross margin, Net margin, EBITDA, OPEX logic  
-    - 5-year forecast  
-    - Investor valuation model  
-    - IRR, ROI, Terminal Value  
-    - Market trend comparison (Global EdTech + Analytics)  
-    - Interactive charts  
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("<div class='section-title'>What This App Delivers</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class="card">
+        • Revenue trend analysis (Monthly / Quarterly / Annual)<br>
+        • MoM / QoQ / YoY growth calculation<br>
+        • EBITDA, Terminal Value, IRR, ROI and 5-year projection<br>
+        • Market size overlay vs your revenue trajectory<br>
+        • Competitor benchmarking view<br>
+        • Automated financial insights for your deck
+        </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown("<div class='section-title'>Who Should Use This</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class="card">
+        • Founders raising in the next 3–12 months<br>
+        • Finance and strategy leads<br>
+        • Investor relations and reporting<br>
+        • EdTech revenue & growth teams<br>
+        • Anyone tired of juggling 14 Excel files
+        </div>
+        """, unsafe_allow_html=True)
 
-    ### Who It's For
-    - Investors analyzing your business  
-    - Founders building pitch decks  
-    - Finance teams automating forecasting  
-    - EdTech/Analytics companies wanting clarity on profitability  
-    """)
+    st.markdown("<div class='section-title'>Core KPIs Tracked</div>", unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.markdown("<div class='kpi'>Revenue</div>", unsafe_allow_html=True)
+    k2.markdown("<div class='kpi'>EBITDA Margin</div>", unsafe_allow_html=True)
+    k3.markdown("<div class='kpi'>IRR</div>", unsafe_allow_html=True)
+    k4.markdown("<div class='kpi'>Terminal Value</div>", unsafe_allow_html=True)
 
-    st.info("Use the left sidebar to navigate to other tabs.")
+# =========================================================
+# TAB 2 - IMPORTANT ATTRIBUTES
+# =========================================================
+with tab2:
+    st.markdown("<div class='section-title'>Required Revenue Dataset Columns</div>", unsafe_allow_html=True)
 
+    desc_map = {
+        "first_payment_date": "First payment date from student (used for time slicing).",
+        "collected_amount": "Amount collected from the student / client (₹).",
+        "total_fee": "Total course / program fee for that deal/student.",
+        "joined_or_not": "Whether the student actually joined (Yes/No or 1/0).",
+        "pay_status": "Payment completion flag (Paid/Partially paid/Pending).",
+        "campaign_name": "Campaign / source attribution for CAC analysis.",
+        "lead_created_date": "Date when the lead was created.",
+        "batch": "Batch identifier for the program.",
+        "pending_amount": "Fee still pending from the student (₹).",
+        "co_assignee": "Coordinator / sales owner name for performance split."
+    }
+
+    df_gloss = pd.DataFrame(
+        [{"Field": k, "Description": v} for k, v in desc_map.items()]
+    )
+    st.dataframe(df_gloss, use_container_width=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("<div class='section-title'>Key Financial Metrics</div>", unsafe_allow_html=True)
+        metrics_list = [
+            "Total Revenue",
+            "Operational Cost",
+            "OPEX",
+            "Gross Profit & Margin",
+            "EBITDA & EBITDA Margin",
+            "Net Profit & Net Margin",
+            "Free Cash Flow (FCF)",
+            "Burn Rate & Runway",
+            "ARR / MRR"
+        ]
+        for m in metrics_list:
+            st.markdown(f"<div class='variable-box'>{m}</div>", unsafe_allow_html=True)
+
+    with c2:
+        st.markdown("<div class='section-title'>Investor & Growth Metrics</div>", unsafe_allow_html=True)
+        metrics_list_2 = [
+            "IRR (Internal Rate of Return)",
+            "ROI (Return on Investment)",
+            "DCF (Discounted Cash Flow) logic",
+            "Terminal Value (EBITDA × multiple)",
+            "CAGR (Revenue growth curve)",
+            "MoM / QoQ / YoY trend view",
+            "Competitor comparisons"
+        ]
+        for m in metrics_list_2:
+            st.markdown(f"<div class='variable-box'>{m}</div>", unsafe_allow_html=True)
 
 
 # =========================================================
-# 2. KEY METRICS TAB
+# TAB 3 - APPLICATION
 # =========================================================
-elif section == "Key Metrics":
-    st.header("📌 Important Attributes & Definitions")
+with tab3:
 
-    st.markdown("""
-    ### 🎯 Key EdTech Financial Metrics
-    **Total Revenue:** Sum collected from courses, consulting, B2B, subscriptions.  
-    **Operational Cost (Direct Cost):** Mentor cost, delivery cost, program running cost.  
-    **OPEX (Indirect Cost):** Salaries, rent, marketing, software tools.  
-    **Gross Profit:** Revenue − Direct Cost.  
-    **Gross Margin %:** (Gross Profit / Revenue) × 100.  
-    **EBITDA:** Earnings before interest, tax, depreciation.  
-    **EBITDA Margin %:** EBITDA ÷ Revenue.  
-    **Net Profit:** Profit after all costs.  
-    **Net Margin %:** Net Profit ÷ Revenue.  
-    **FCF (Free Cash Flow):** Money left after reinvestments.  
-    **Burn Rate:** How much money the company loses each month.  
-    **Runway:** Months the company can survive with current cash.  
-    **DCF:** Discounted cash flow valuation.  
-    **IRR:** Annualized return rate for investors.  
-    **CAGR:** Annual growth rate over multiple years.  
-    **CAC:** Acquisition cost per customer.  
-    **MRR/ARR:** Subscription revenue metrics.  
-    """)
+    # -----------------------------
+    # DATASET UPLOAD SECTION
+    # -----------------------------
+    st.markdown("<div class='section-title'>Step 1: Load Revenue Dataset</div>", unsafe_allow_html=True)
 
+    df_rev = None
 
-# =========================================================
-# 3. INVESTOR VALUATION MODEL TAB
-# =========================================================
-elif section == "Investor Valuation Model":
-    st.header("💰 Investor Valuation Calculator")
+    mode = st.radio(
+        "Choose dataset mode:",
+        ["Google Sheet link", "Upload CSV + Column Mapping"],
+        horizontal=True
+    )
+
+    if mode == "Google Sheet link":
+        sheet_url = st.text_input("Paste your Google Sheet link (must be public or accessible):", "")
+        if sheet_url:
+            try:
+                sheet_id = sheet_url.split("/d/")[1].split("/")[0]
+                csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+                df_raw = pd.read_csv(csv_url)
+                df_raw.columns = df_raw.columns.str.strip().str.lower().str.replace(" ", "_")
+                st.success("Google Sheet loaded successfully.")
+                st.dataframe(df_raw.head(), use_container_width=True)
+                df_rev = df_raw.copy()
+            except Exception as e:
+                st.error(f"Failed to load Google Sheet: {e}")
+
+    else:  # Upload CSV + mapping
+        uploaded = st.file_uploader("Upload CSV file", type=["csv"])
+        if uploaded is not None:
+            df_raw = pd.read_csv(uploaded)
+            df_raw.columns = df_raw.columns.str.strip().str.lower().str.replace(" ", "_")
+
+            st.markdown("Preview of uploaded file:")
+            st.dataframe(df_raw.head(), use_container_width=True)
+
+            st.markdown("Map your columns to required fields:")
+            mapping = {}
+            for req in REQUIRED_COLS:
+                mapping[req] = st.selectbox(
+                    f"Map to → {req}",
+                    options=["-- Select --"] + list(df_raw.columns),
+                    key=f"map_{req}"
+                )
+
+            if st.button("Apply Mapping"):
+                missing = [k for k, v in mapping.items() if v == "-- Select --"]
+                if missing:
+                    st.error("Please map all required fields: " + ", ".join(missing))
+                else:
+                    inv = {v: k for k, v in mapping.items()}
+                    df_mapped = df_raw.rename(columns=inv)
+                    st.success("Mapping applied successfully.")
+                    st.dataframe(df_mapped.head(), use_container_width=True)
+                    df_rev = df_mapped.copy()
+
+    if df_rev is None:
+        st.info("Load a dataset using one of the modes to unlock analytics.")
+        st.stop()
+
+    # -----------------------------
+    # BASIC PREPROCESSING
+    # -----------------------------
+    if "first_payment_date" not in df_rev.columns or "collected_amount" not in df_rev.columns:
+        st.error("Dataset must at least have 'first_payment_date' and 'collected_amount'.")
+        st.stop()
+
+    df_rev["first_payment_date"] = pd.to_datetime(df_rev["first_payment_date"], errors="coerce")
+    df_rev = df_rev.dropna(subset=["first_payment_date"])
+    df_rev["collected_amount"] = pd.to_numeric(df_rev["collected_amount"], errors="coerce").fillna(0)
+
+    # Date splits
+    df_rev["year"] = df_rev["first_payment_date"].dt.year
+    df_rev["month_period"] = df_rev["first_payment_date"].dt.to_period("M")
+    df_rev["quarter_period"] = df_rev["first_payment_date"].dt.to_period("Q")
+
+    st.markdown("<div class='section-title'>Step 2: Data Snapshot</div>", unsafe_allow_html=True)
+    st.dataframe(df_rev.head(10), use_container_width=True)
+
+    # -----------------------------------------------------
+    # REVENUE AGGREGATIONS + GROWTH (MoM / QoQ / YoY)
+    # -----------------------------------------------------
+    st.markdown("<div class='section-title'>Revenue & Growth Analytics</div>", unsafe_allow_html=True)
+
+    monthly = df_rev.groupby("month_period")["collected_amount"].sum().sort_index()
+    quarterly = df_rev.groupby("quarter_period")["collected_amount"].sum().sort_index()
+    yearly = df_rev.groupby("year")["collected_amount"].sum().sort_index()
+
+    mom = monthly.pct_change() * 100
+    qoq = quarterly.pct_change() * 100
+    yoy = yearly.pct_change() * 100
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write("**Monthly Revenue (₹)**")
+        st.dataframe(monthly.to_frame("revenue").style.format("{:,.2f}"), use_container_width=True)
+        st.write("**MoM Growth (%)**")
+        st.dataframe(mom.to_frame("MoM %").style.format("{:.2f}"), use_container_width=True)
+    with c2:
+        st.write("**Quarterly Revenue (₹)**")
+        st.dataframe(quarterly.to_frame("revenue").style.format("{:,.2f}"), use_container_width=True)
+        st.write("**QoQ Growth (%)**")
+        st.dataframe(qoq.to_frame("QoQ %").style.format("{:.2f}"), use_container_width=True)
+
+    st.write("**Annual Revenue (₹)**")
+    st.dataframe(yearly.to_frame("revenue").style.format("{:,.2f}"), use_container_width=True)
+    st.write("**YoY Growth (%)**")
+    st.dataframe(yoy.to_frame("YoY %").style.format("{:.2f}"), use_container_width=True)
+
+    # -----------------------------------------------------
+    # MoM Trend Chart (Revenue + Growth)
+    # -----------------------------------------------------
+    st.markdown("<div class='section-title'>Monthly Revenue vs MoM Growth</div>", unsafe_allow_html=True)
+    if len(monthly) > 1:
+        fig, ax1 = plt.subplots(figsize=(10,5))
+        ax1.bar(monthly.index.astype(str), monthly.values, alpha=0.7)
+        ax1.set_ylabel("Revenue (₹)", color="#064b86")
+        ax1.tick_params(axis='y', labelcolor="#064b86")
+
+        ax2 = ax1.twinx()
+        ax2.plot(monthly.index.astype(str), mom.values, color="red", marker="o", linewidth=2)
+        ax2.set_ylabel("Growth % (MoM)", color="red")
+        ax2.tick_params(axis='y', labelcolor="red")
+
+        plt.xticks(rotation=45)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        st.pyplot(fig)
+    else:
+        st.info("Need at least 2 months of data for MoM chart.")
+
+    # -----------------------------------------------------
+    # BASIC COMPANY KPIs FROM DATA
+    # -----------------------------------------------------
+    total_revenue = df_rev["collected_amount"].sum()
+    unique_students = df_rev["batch"].nunique() if "batch" in df_rev.columns else np.nan
+    latest_year = yearly.index.max()
+    latest_year_revenue = yearly.loc[latest_year] if len(yearly) > 0 else 0
+
+    st.markdown("<div class='section-title'>Core Revenue KPIs (from dataset)</div>", unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.markdown(f"<div class='kpi'>Total Revenue<br/>₹{total_revenue:,.0f}</div>", unsafe_allow_html=True)
+    if not np.isnan(unique_students):
+        k2.markdown(f"<div class='kpi'>Unique Batches<br/>{int(unique_students)}</div>", unsafe_allow_html=True)
+    else:
+        k2.markdown(f"<div class='kpi'>Unique Batches<br/>N/A</div>", unsafe_allow_html=True)
+    k3.markdown(f"<div class='kpi'>Latest Year Revenue<br/>₹{latest_year_revenue:,.0f}</div>", unsafe_allow_html=True)
+    if len(yoy.dropna()) > 0:
+        k4.markdown(f"<div class='kpi'>Avg YoY Growth<br/>{yoy.dropna().mean():.2f}%</div>", unsafe_allow_html=True)
+    else:
+        k4.markdown(f"<div class='kpi'>Avg YoY Growth<br/>N/A</div>", unsafe_allow_html=True)
+
+    # -----------------------------------------------------
+    # INVESTOR MODEL (5-YEAR PROJECTION BASED ON LATEST YEAR)
+    # -----------------------------------------------------
+    st.markdown("<div class='section-title'>Investor Projection & Valuation Model</div>", unsafe_allow_html=True)
 
     colA, colB = st.columns(2)
-
     with colA:
-        total_investment = st.number_input("Total Investment (₹)", min_value=0.0, step=100000.0)
-        equity = st.number_input("Equity (0.20 = 20%)", min_value=0.0, max_value=1.0, value=0.20)
-        tenure = st.number_input("Projection Years", min_value=1, max_value=10, value=5)
-        exit_year = st.number_input("Exit Year", min_value=1, max_value=10, value=5)
+        base_revenue = st.number_input(
+            "Base Annual Revenue for Year 1 (₹)",
+            value=float(latest_year_revenue if latest_year_revenue > 0 else total_revenue),
+            step=100000.0
+        )
+        growth_rate = st.number_input("YoY Growth (0.25 = 25%)", min_value=0.0, max_value=1.0, value=0.25)
+        ebitda_margin = st.number_input("EBITDA Margin (0.26 = 26%)", min_value=0.0, max_value=1.0, value=0.26)
 
     with colB:
-        revenue_y1 = st.number_input("Current Annual Revenue (₹)", min_value=0.0)
-        growth = st.number_input("Expected Annual Growth (0.25 = 25%)", min_value=0.0, max_value=1.0, value=0.25)
-        ebitda_margin = st.number_input("EBITDA Margin (0.26 = 26%)", min_value=0.0, max_value=1.0, value=0.26)
+        investment = st.number_input("Investor Total Investment (₹)", min_value=0.0, step=100000.0, value=1000000.0)
+        equity = st.number_input("Equity % (0.20 = 20%)", min_value=0.0, max_value=1.0, value=0.20)
         exit_multiple = st.number_input("Exit EBITDA Multiple (X)", min_value=1.0, max_value=20.0, value=6.0)
 
-    if st.button("Compute Investor Returns"):
-        
-        # 5-Year Projection
-        years = np.arange(1, tenure + 1)
-        rev = []
-        ebit = []
-        cur = revenue_y1
+    if st.button("Run 5-Year Projection & Investor Outcome"):
+
+        years = np.arange(1, 6)
+        rev_proj = []
+        ebit_proj = []
+        cur = base_revenue
 
         for _ in years:
-            rev.append(cur)
-            ebit.append(cur * ebitda_margin)
-            cur *= (1 + growth)
+            rev_proj.append(cur)
+            ebit_proj.append(cur * ebitda_margin)
+            cur *= (1 + growth_rate)
 
-        df = pd.DataFrame({
+        df_proj = pd.DataFrame({
             "Year": years,
-            "Revenue (₹)": rev,
-            "EBITDA (₹)": ebit,
-            "Valuation (₹)": np.array(ebit) * exit_multiple
+            "Revenue (₹)": rev_proj,
+            "EBITDA (₹)": ebit_proj,
+            "Valuation (₹)": np.array(ebit_proj) * exit_multiple
         })
 
-        st.subheader("📄 Projection Table")
-        st.dataframe(df.style.format("{:,.2f}"))
+        st.write("### 5-Year Projection Table")
+        st.dataframe(df_proj.style.format("{:,.2f}"), use_container_width=True)
 
-        exit_ebitda = df.loc[df["Year"] == exit_year, "EBITDA (₹)"].iloc[0]
-        terminal_value = exit_ebitda * exit_multiple
+        terminal_value = df_proj["Valuation (₹)"].iloc[-1]
         investor_payout = terminal_value * equity
-        net_benefit = investor_payout - total_investment
-        roi = net_benefit / total_investment
-        irr = nf.irr([-total_investment] + [0]*(exit_year-1) + [investor_payout])
+        net_gain = investor_payout - investment
+        roi = net_gain / investment if investment > 0 else np.nan
+        irr = nf.irr([-investment] + [0, 0, 0, investor_payout]) if investment > 0 else np.nan
 
-        st.subheader("📌 Investor Summary")
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown(f"<div class='kpi'>Terminal Value<br/>₹{terminal_value:,.0f}</div>", unsafe_allow_html=True)
+        k2.markdown(f"<div class='kpi'>Investor Payout<br/>₹{investor_payout:,.0f}</div>", unsafe_allow_html=True)
+        if not np.isnan(roi):
+            k3.markdown(f"<div class='kpi'>ROI<br/>{roi*100:.2f}%</div>", unsafe_allow_html=True)
+        else:
+            k3.markdown(f"<div class='kpi'>ROI<br/>N/A</div>", unsafe_allow_html=True)
+        if not np.isnan(irr):
+            k4.markdown(f"<div class='kpi'>IRR<br/>{irr*100:.2f}%</div>", unsafe_allow_html=True)
+        else:
+            k4.markdown(f"<div class='kpi'>IRR<br/>N/A</div>", unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Terminal Value (₹)", f"{terminal_value:,.2f}")
-        col2.metric("Investor Payout (₹)", f"{investor_payout:,.2f}")
-        col3.metric("ROI (%)", f"{roi*100:.2f}%")
+        # Chart: revenue vs EBITDA
+        st.write("### Revenue vs EBITDA Projection")
+        fig2, ax = plt.subplots(figsize=(10,5))
+        ax.bar(df_proj["Year"], df_proj["Revenue (₹)"], label="Revenue (₹)", alpha=0.7)
+        ax.plot(df_proj["Year"], df_proj["EBITDA (₹)"], color="red", marker="o", label="EBITDA (₹)")
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        st.pyplot(fig2)
 
-        col1.metric("IRR (%)", f"{irr*100:.2f}%")
-        col2.metric("Net Profit to Investor (₹)", f"{net_benefit:,.2f}")
-        col3.metric("Equity (%)", f"{equity*100:.2f}%")
+        # ------------------------
+        # COMPETITOR COMPARISON
+        # ------------------------
+        st.markdown("<div class='section-title'>Competitor Comparison (Static Benchmarks)</div>", unsafe_allow_html=True)
 
+        competitors = pd.DataFrame({
+            "Company": ["Your Org", "Scaler", "UpGrad", "Simplilearn", "Great Learning"],
+            "Revenue_Cr": [
+                base_revenue / 1e7,
+                400, 1200, 600, 800
+            ],
+            "EBITDA_Margin": [
+                ebitda_margin,
+                0.14, 0.09, 0.11, 0.12
+            ],
+            "YoY_Growth": [
+                growth_rate,
+                0.29, 0.24, 0.18, 0.22
+            ]
+        })
 
-# =========================================================
-# 4. 5-YEAR PROJECTION TAB
-# =========================================================
-elif section == "5-Year Projection":
-    st.header("📈 5-Year Financial Projection")
+        st.dataframe(
+            competitors.style.format({
+                "Revenue_Cr": "{:,.1f}",
+                "EBITDA_Margin": "{:.1%}",
+                "YoY_Growth": "{:.1%}"
+            }),
+            use_container_width=True
+        )
 
-    revenue = st.number_input("Base Revenue (Year 1)", value=6000000.0)
-    growth_rate = st.number_input("Annual Growth Rate", value=0.25)
-    ebitda_margin = st.number_input("EBITDA Margin", value=0.26)
-    
-    rev = []
-    ebit = []
-    cur = revenue
+        fig3 = px.bar(
+            competitors,
+            x="Company",
+            y="Revenue_Cr",
+            title="Revenue Benchmark (₹ Cr)",
+            text="Revenue_Cr"
+        )
+        fig3.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+        fig3.update_layout(yaxis_title="Revenue (₹ Cr)")
+        st.plotly_chart(fig3, use_container_width=True)
 
-    for _ in range(5):
-        rev.append(cur)
-        ebit.append(cur * ebitda_margin)
-        cur *= (1 + growth_rate)
+        # ------------------------
+        # AUTOMATED INSIGHTS
+        # ------------------------
+        st.markdown("<div class='section-title'>Automated Insights</div>", unsafe_allow_html=True)
 
-    df = pd.DataFrame({
-        "Year": [1,2,3,4,5],
-        "Revenue (₹)": rev,
-        "EBITDA (₹)": ebit
-    })
+        insights = []
 
-    st.dataframe(df.style.format("{:,.2f}"))
+        if len(mom.dropna()) > 0 and mom.dropna().mean() > 5:
+            insights.append("Your average MoM growth is strong, indicating healthy short-term momentum in revenue.")
 
-    st.subheader("📊 Revenue & EBITDA Chart")
-    fig, ax = plt.subplots(figsize=(10,5))
-    ax.bar(df["Year"], df["Revenue (₹)"], label="Revenue")
-    ax.plot(df["Year"], df["EBITDA (₹)"], marker='o', color='red', label="EBITDA")
-    ax.legend()
-    st.pyplot(fig)
+        if len(yoy.dropna()) > 0 and yoy.dropna().mean() > 20:
+            insights.append("Your YoY growth is above typical EdTech benchmarks, which is attractive for investors.")
 
+        if ebitda_margin >= 0.25:
+            insights.append("EBITDA margins at or above 25% signal a lean cost structure and strong unit economics.")
 
-# =========================================================
-# 5. MARKET TREND TAB
-# =========================================================
-elif section == "Market Trend":
-    st.header("🌎 Industry Trend vs Your Growth")
+        if growth_rate > competitors["YoY_Growth"].median():
+            insights.append("Your assumed forward growth rate is higher than most key market players, positioning you as a high-growth asset.")
 
-    years = np.arange(1, 6)
-    global_base = 142500  # Cr
-    segment_base = 20000  # Cr
+        if terminal_value < base_revenue * 2:
+            insights.append("Terminal value is not very aggressive relative to base revenue; consider validating your multiple or growth assumptions.")
 
-    global_cagr = 0.18
-    segment_cagr = 0.22
+        if not insights:
+            insights.append("No major red flags or standout strengths detected. Your assumptions look moderate and stable.")
 
-    g = []
-    s = []
-    gc = global_base
-    sc = segment_base
+        for text in insights:
+            st.markdown(f"<div class='card'>{text}</div>", unsafe_allow_html=True)
 
-    for _ in years:
-        g.append(gc)
-        s.append(sc)
-        gc *= 1 + global_cagr
-        sc *= 1 + segment_cagr
+        # ------------------------
+        # PDF DOWNLOAD (if pdfkit available)
+        # ------------------------
+        st.markdown("<div class='section-title'>Download Summary</div>", unsafe_allow_html=True)
 
-    st.subheader("📊 Market Growth Chart")
-    fig, ax = plt.subplots(figsize=(10,5))
-    ax.plot(years, g, marker='o', label="Global EdTech + Analytics (₹ Cr)")
-    ax.plot(years, s, marker='s', label="Workforce Dev + Analytics (₹ Cr)")
-    ax.legend()
-    ax.grid(True, linestyle="--")
-    st.pyplot(fig)
+        if PDFKIT_AVAILABLE:
+            if st.button("Generate & Download PDF Summary"):
+                html = f"""
+                <h1>EdTech Financial Summary</h1>
+                <h2>Key Numbers</h2>
+                <p><b>Total Revenue (data):</b> ₹{total_revenue:,.0f}</p>
+                <p><b>Base Revenue (Year 1):</b> ₹{base_revenue:,.0f}</p>
+                <p><b>Terminal Value:</b> ₹{terminal_value:,.0f}</p>
+                <p><b>Investor Payout:</b> ₹{investor_payout:,.0f}</p>
+                <p><b>ROI:</b> {roi*100:.2f}%</p>
+                <p><b>IRR:</b> {irr*100:.2f}%</p>
+                <h2>Insights</h2>
+                <ul>
+                {''.join([f'<li>{ins}</li>' for ins in insights])}
+                </ul>
+                """
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+                    pdfkit.from_string(html, tmpfile.name)
+                    tmpfile.seek(0)
+                    pdf_bytes = tmpfile.read()
+
+                st.download_button(
+                    "Download PDF",
+                    data=pdf_bytes,
+                    file_name="EdTech_Financial_Summary.pdf",
+                    mime="application/pdf"
+                )
+        else:
+            st.info("pdfkit not available. Install pdfkit & wkhtmltopdf on server to enable PDF export.")

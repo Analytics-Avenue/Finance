@@ -555,51 +555,7 @@ with tab3:
         k3.markdown(f"<div class='kpi'>ROI<br/>{roi*100:.2f}%</div>", unsafe_allow_html=True)
         k4.markdown(f"<div class='kpi'>IRR<br/>{irr*100:.2f}%</div>", unsafe_allow_html=True)
 
-        # =====================================================
-        # STATIC COMPETITOR COMPARISON
-        # =====================================================
-        st.markdown("<div class='section-title'>Competitor Comparison (Static Benchmarks)</div>", unsafe_allow_html=True)
-
-        competitors = pd.DataFrame({
-            "Company": ["Your Org", "Scaler", "UpGrad", "Simplilearn", "Great Learning"],
-            "Revenue_Cr": [
-                base_rev / 1e7,  # approximate conversion
-                400, 1200, 600, 800
-            ],
-            "EBITDA_Margin": [
-                ebitda_margin,
-                0.14, 0.09, 0.11, 0.12
-            ],
-            "YoY_Growth": [
-                growth,
-                0.29, 0.24, 0.18, 0.22
-            ]
-        })
-
-        st.dataframe(
-            competitors.style.format({
-                "Revenue_Cr": "{:,.1f}",
-                "EBITDA_Margin": "{:.1%}",
-                "YoY_Growth": "{:.1%}"
-            }),
-            width="stretch"
-        )
-
-        fig_comp = px.bar(
-            competitors,
-            x="Company",
-            y="Revenue_Cr",
-            title="Revenue Benchmark (₹ Cr)",
-            text="Revenue_Cr"
-        )
-        fig_comp.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig_comp.update_layout(
-            yaxis_title="Revenue (₹ Cr)",
-            xaxis_tickangle=-20,
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=60, b=80)
-        )
-        st.plotly_chart(fig_comp, width="stretch")
+        
 
         # =====================================================
         # AUTOMATED INSIGHTS

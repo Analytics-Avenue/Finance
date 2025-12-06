@@ -5,7 +5,7 @@ import numpy_financial as nf
 import matplotlib.pyplot as plt
 import plotly.express as px
 
-# =========================================================
+# ========================================================
 # PAGE CONFIG
 # =========================================================
 st.set_page_config(

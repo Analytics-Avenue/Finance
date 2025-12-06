@@ -573,9 +573,6 @@ with tab3:
         if ebitda_margin >= 0.25:
             insights.append("EBITDA margin ≥ 25% indicates a lean cost structure and strong unit economics.")
 
-        if growth > competitors["YoY_Growth"].median():
-            insights.append("Your assumed growth rate is higher than key competitors, positioning you as a high-growth player.")
-
         if terminal < base_rev * 2:
             insights.append("Terminal value isn't very aggressive vs Year 1 revenue. Consider revisiting growth or multiples with investors.")
 

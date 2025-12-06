@@ -236,9 +236,6 @@ with tab2:
 # =========================================================
 with tab3:
 
-    # -----------------------------
-    # DATASET UPLOAD SECTION
-    # -----------------------------
     st.markdown("<div class='section-title'>Step 1: Load Revenue Dataset</div>", unsafe_allow_html=True)
 
     df_rev = None
@@ -249,8 +246,12 @@ with tab3:
         horizontal=True
     )
 
+    # -----------------------------
+    # MODE 1: GOOGLE SHEET LINK
+    # -----------------------------
     if mode == "Google Sheet link":
         sheet_url = st.text_input("Paste your Google Sheet link (must be public or accessible):", "")
+
         if sheet_url:
             try:
                 sheet_id = sheet_url.split("/d/")[1].split("/")[0]
@@ -263,7 +264,10 @@ with tab3:
             except Exception as e:
                 st.error(f"Failed to load Google Sheet: {e}")
 
-    else:  # Upload CSV + mapping
+    # -----------------------------
+    # MODE 2: UPLOAD CSV + COLUMN MAPPING
+    # -----------------------------
+    else:
         uploaded = st.file_uploader("Upload CSV file", type=["csv"])
         if uploaded is not None:
             df_raw = pd.read_csv(uploaded)
@@ -292,213 +296,197 @@ with tab3:
                     st.dataframe(df_mapped.head(), use_container_width=True)
                     df_rev = df_mapped.copy()
 
+    # If still nothing loaded
     if df_rev is None:
         st.info("Load a dataset using one of the modes to unlock analytics.")
         st.stop()
 
-    # -----------------------------
+    # -----------------------------------------------------
     # BASIC PREPROCESSING
-    # -----------------------------
-    if "first_payment_date" not in df_rev.columns or "collected_amount" not in df_rev.columns:
-        st.error("Dataset must at least have 'first_payment_date' and 'collected_amount'.")
+    # -----------------------------------------------------
+    df = df_rev.copy()  # <- use df internally from here
+    if "first_payment_date" not in df.columns or "collected_amount" not in df.columns:
+        st.error("Dataset must at least have 'first_payment_date' and 'collected_amount' columns after mapping.")
         st.stop()
 
-    df_rev["first_payment_date"] = pd.to_datetime(df_rev["first_payment_date"], errors="coerce")
-    df_rev = df_rev.dropna(subset=["first_payment_date"])
-    df_rev["collected_amount"] = pd.to_numeric(df_rev["collected_amount"], errors="coerce").fillna(0)
+    df["first_payment_date"] = pd.to_datetime(df["first_payment_date"], errors="coerce")
+    df = df.dropna(subset=["first_payment_date"])
+    df["collected_amount"] = pd.to_numeric(df["collected_amount"], errors="coerce").fillna(0)
 
-    # Date splits
-    df_rev["year"] = df_rev["first_payment_date"].dt.year
-    df_rev["month_period"] = df_rev["first_payment_date"].dt.to_period("M")
-    df_rev["quarter_period"] = df_rev["first_payment_date"].dt.to_period("Q")
+    df["year"] = df["first_payment_date"].dt.year
+    df["month_period"] = df["first_payment_date"].dt.to_period("M")
+    df["quarter_period"] = df["first_payment_date"].dt.to_period("Q")
 
     st.markdown("<div class='section-title'>Step 2: Data Snapshot</div>", unsafe_allow_html=True)
-    st.dataframe(df_rev.head(10), use_container_width=True)
-
-    # ----------------------------------------------
-    # REVENUE SPLITS + MOM / QOQ / YOY CALCULATIONS
-    # ----------------------------------------------
-    
-    # Ensure collected_amount exists
-    if "collected_amount" not in df.columns:
-        st.error("Your dataset does not have a 'collected_amount' column.")
-        st.stop()
-    
-    # Ensure date column is clean
-    df['first_payment_date'] = pd.to_datetime(df['first_payment_date'], errors='coerce')
-    df = df.dropna(subset=['first_payment_date'])
-    
-    # -----------------------------
-    # MONTHLY REVENUE
-    # -----------------------------
-    monthly = (
-        df.groupby(df['first_payment_date'].dt.to_period("M"))['collected_amount']
-        .sum()
-    )
-    monthly.index.name = "month_period"
-    
-    # -----------------------------
-    # QUARTERLY REVENUE
-    # -----------------------------
-    quarterly = (
-        df.groupby(df['first_payment_date'].dt.to_period("Q"))['collected_amount']
-        .sum()
-    )
-    quarterly.index.name = "quarter_period"
-    
-    # -----------------------------
-    # ANNUAL REVENUE
-    # -----------------------------
-    yearly = (
-        df.groupby(df['first_payment_date'].dt.year)['collected_amount']
-        .sum()
-    )
-    yearly.index.name = "year"
-    
-    # -----------------------------
-    # MoM Growth
-    # -----------------------------
-    mom = monthly.pct_change() * 100
-    mom.index.name = "month_period"
-    
-    # -----------------------------
-    # QoQ Growth
-    # -----------------------------
-    qoq = quarterly.pct_change() * 100
-    qoq.index.name = "quarter_period"
-    
-    # -----------------------------
-    # YoY Growth
-    # -----------------------------
-    yoy = yearly.pct_change() * 100
-    yoy.index.name = "year"
+    st.dataframe(df.head(10), use_container_width=True)
 
     # -----------------------------------------------------
-    # CLEAN & ORDERED REVENUE + GROWTH ANALYTICS
+    # REVENUE SPLITS + MOM / QOQ / YOY
     # -----------------------------------------------------
-    
     st.markdown("<div class='section-title'>Revenue & Growth Analytics</div>", unsafe_allow_html=True)
-    
-    # --- Monthly Revenue Table ---
-    st.markdown("### Monthly Revenue (Table)")
+
+    monthly = df.groupby("month_period")["collected_amount"].sum().sort_index()
+    quarterly = df.groupby("quarter_period")["collected_amount"].sum().sort_index()
+    yearly = df.groupby("year")["collected_amount"].sum().sort_index()
+
+    mom = monthly.pct_change() * 100
+    qoq = quarterly.pct_change() * 100
+    yoy = yearly.pct_change() * 100
+
+    # -----------------------------
+    # MONTHLY: TABLE → CHART
+    # -----------------------------
+    st.markdown("### 📌 Monthly Revenue (Table)")
     monthly_df = monthly.to_frame("Revenue (₹)").reset_index()
     monthly_df["month_period"] = monthly_df["month_period"].astype(str)
     st.dataframe(monthly_df.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
-    
-    st.markdown("### Monthly Revenue Trend Chart")
-    fig1, ax1 = plt.subplots(figsize=(11,5))
-    ax1.plot(monthly_df["month_period"], monthly_df["Revenue (₹)"], marker="o", color="#064b86")
-    ax1.set_xlabel("Month")
-    ax1.set_ylabel("Revenue (₹)")
-    ax1.grid(alpha=0.3)
-    plt.xticks(rotation=45)
-    st.pyplot(fig1)
-    
+
+    st.markdown("### 📈 Monthly Revenue Trend")
+    if len(monthly_df) > 0:
+        fig_m1, ax_m1 = plt.subplots(figsize=(11,5))
+        ax_m1.plot(monthly_df["month_period"], monthly_df["Revenue (₹)"], marker="o", color="#064b86")
+        ax_m1.set_xlabel("Month")
+        ax_m1.set_ylabel("Revenue (₹)")
+        ax_m1.grid(alpha=0.3)
+        plt.xticks(rotation=45)
+        st.pyplot(fig_m1)
+    else:
+        st.info("Not enough data for monthly chart.")
+
     st.markdown("---")
-    
-    # --- MoM Growth Table ---
-    st.markdown("### MoM Growth (%)")
+
+    # -----------------------------
+    # MoM GROWTH: TABLE → CHART
+    # -----------------------------
+    st.markdown("### 📌 MoM Growth (%)")
     mom_df = mom.to_frame("MoM %").reset_index()
     mom_df["month_period"] = mom_df["month_period"].astype(str)
     st.dataframe(mom_df.style.format({"MoM %": "{:.2f}"}), use_container_width=True)
-    
-    st.markdown("### MoM Growth Trend Chart")
-    fig1b, ax1b = plt.subplots(figsize=(11,5))
-    ax1b.bar(mom_df["month_period"], mom_df["MoM %"], color="#ff6b6b", alpha=0.8)
-    ax1b.set_xlabel("Month")
-    ax1b.set_ylabel("MoM Growth %")
-    ax1b.grid(alpha=0.3)
-    plt.xticks(rotation=45)
-    st.pyplot(fig1b)
-    
+
+    st.markdown("### 📈 MoM Growth Trend")
+    if len(mom_df) > 1:
+        fig_m2, ax_m2 = plt.subplots(figsize=(11,5))
+        ax_m2.bar(mom_df["month_period"], mom_df["MoM %"], color="#ff6b6b", alpha=0.8)
+        ax_m2.set_xlabel("Month")
+        ax_m2.set_ylabel("MoM Growth %")
+        ax_m2.grid(alpha=0.3)
+        plt.xticks(rotation=45)
+        st.pyplot(fig_m2)
+    else:
+        st.info("Need at least 2 months for MoM trend.")
+
     st.markdown("---")
-    
-    # --- Quarterly Revenue Table ---
-    st.markdown("### Quarterly Revenue (Table)")
+
+    # -----------------------------
+    # QUARTERLY: TABLE → CHART
+    # -----------------------------
+    st.markdown("### 📌 Quarterly Revenue (Table)")
     quarterly_df = quarterly.to_frame("Revenue (₹)").reset_index()
     quarterly_df["quarter_period"] = quarterly_df["quarter_period"].astype(str)
     st.dataframe(quarterly_df.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
-    
-    st.markdown("### Quarterly Revenue Trend Chart")
-    fig2, ax2 = plt.subplots(figsize=(11,5))
-    ax2.bar(quarterly_df["quarter_period"], quarterly_df["Revenue (₹)"], color="#064b86")
-    ax2.set_xlabel("Quarter")
-    ax2.set_ylabel("Revenue (₹)")
-    ax2.grid(alpha=0.3)
-    plt.xticks(rotation=45)
-    st.pyplot(fig2)
-    
+
+    st.markdown("### 📈 Quarterly Revenue Trend")
+    if len(quarterly_df) > 0:
+        fig_q1, ax_q1 = plt.subplots(figsize=(11,5))
+        ax_q1.bar(quarterly_df["quarter_period"], quarterly_df["Revenue (₹)"], color="#064b86")
+        ax_q1.set_xlabel("Quarter")
+        ax_q1.set_ylabel("Revenue (₹)")
+        ax_q1.grid(alpha=0.3)
+        plt.xticks(rotation=45)
+        st.pyplot(fig_q1)
+    else:
+        st.info("Not enough data for quarterly chart.")
+
     st.markdown("---")
-    
-    # --- QoQ Growth Table ---
-    st.markdown("### QoQ Growth (%)")
+
+    # -----------------------------
+    # QoQ: TABLE → CHART
+    # -----------------------------
+    st.markdown("### 📌 QoQ Growth (%)")
     qoq_df = qoq.to_frame("QoQ %").reset_index()
     qoq_df["quarter_period"] = qoq_df["quarter_period"].astype(str)
     st.dataframe(qoq_df.style.format({"QoQ %": "{:.2f}"}), use_container_width=True)
-    
-    st.markdown("### QoQ Growth Trend Chart")
-    fig2b, ax2b = plt.subplots(figsize=(11,5))
-    ax2b.plot(qoq_df["quarter_period"], qoq_df["QoQ %"], marker="o", linewidth=2, color="red")
-    ax2b.set_xlabel("Quarter")
-    ax2b.set_ylabel("QoQ Growth %")
-    ax2b.grid(alpha=0.3)
-    plt.xticks(rotation=45)
-    st.pyplot(fig2b)
-    
+
+    st.markdown("### 📈 QoQ Growth Trend")
+    if len(qoq_df) > 1:
+        fig_q2, ax_q2 = plt.subplots(figsize=(11,5))
+        ax_q2.plot(qoq_df["quarter_period"], qoq_df["QoQ %"], marker="o", color="red")
+        ax_q2.set_xlabel("Quarter")
+        ax_q2.set_ylabel("QoQ Growth %")
+        ax_q2.grid(alpha=0.3)
+        plt.xticks(rotation=45)
+        st.pyplot(fig_q2)
+    else:
+        st.info("Need at least 2 quarters for QoQ trend.")
+
     st.markdown("---")
-    
-    # --- Annual Revenue Table ---
-    st.markdown("### Annual Revenue (Table)")
+
+    # -----------------------------
+    # ANNUAL: TABLE → CHART
+    # -----------------------------
+    st.markdown("### 📌 Annual Revenue (Table)")
     yearly_df = yearly.to_frame("Revenue (₹)").reset_index()
     st.dataframe(yearly_df.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
-    
-    st.markdown("### Annual Revenue Bar Chart")
-    fig3, ax3 = plt.subplots(figsize=(11,5))
-    ax3.bar(yearly_df["year"], yearly_df["Revenue (₹)"], color="#064b86")
-    ax3.set_xlabel("Year")
-    ax3.set_ylabel("Revenue (₹)")
-    ax3.grid(alpha=0.3)
-    st.pyplot(fig3)
-    
+
+    st.markdown("### 📈 Annual Revenue Trend")
+    if len(yearly_df) > 0:
+        fig_y1, ax_y1 = plt.subplots(figsize=(11,5))
+        ax_y1.bar(yearly_df["year"], yearly_df["Revenue (₹)"], color="#064b86")
+        ax_y1.set_xlabel("Year")
+        ax_y1.set_ylabel("Revenue (₹)")
+        ax_y1.grid(alpha=0.3)
+        st.pyplot(fig_y1)
+    else:
+        st.info("Not enough data for annual chart.")
+
     st.markdown("---")
-    
-    # --- YoY Growth Table ---
-    st.markdown("### YoY Growth (%)")
+
+    # -----------------------------
+    # YoY: TABLE → CHART
+    # -----------------------------
+    st.markdown("### 📌 YoY Growth (%)")
     yoy_df = yoy.to_frame("YoY %").reset_index()
     st.dataframe(yoy_df.style.format({"YoY %": "{:.2f}"}), use_container_width=True)
-    
-    st.markdown("### YoY Growth Trend Chart")
-    fig3b, ax3b = plt.subplots(figsize=(11,5))
-    ax3b.plot(yoy_df["year"], yoy_df["YoY %"], marker="o", color="red")
-    ax3b.set_xlabel("Year")
-    ax3b.set_ylabel("YoY Growth %")
-    ax3b.grid(alpha=0.3)
-    st.pyplot(fig3b)
-    
-    st.markdown("---")
-    # -----------------------------------------------------
-    # BASIC COMPANY KPIs FROM DATA
-    # -----------------------------------------------------
-    total_revenue = df_rev["collected_amount"].sum()
-    unique_students = df_rev["batch"].nunique() if "batch" in df_rev.columns else np.nan
-    latest_year = yearly.index.max()
-    latest_year_revenue = yearly.loc[latest_year] if len(yearly) > 0 else 0
 
-    st.markdown("<div class='section-title'>Core Revenue KPIs (from dataset)</div>", unsafe_allow_html=True)
+    st.markdown("### 📈 YoY Growth Trend")
+    if len(yoy_df) > 1:
+        fig_y2, ax_y2 = plt.subplots(figsize=(11,5))
+        ax_y2.plot(yoy_df["year"], yoy_df["YoY %"], marker="o", color="red")
+        ax_y2.set_xlabel("Year")
+        ax_y2.set_ylabel("YoY Growth %")
+        ax_y2.grid(alpha=0.3)
+        st.pyplot(fig_y2)
+    else:
+        st.info("Need at least 2 years for YoY trend.")
+
+    st.markdown("---")
+
+    # -----------------------------------------------------
+    # CORE KPIs
+    # -----------------------------------------------------
+    total_revenue = df["collected_amount"].sum()
+    latest_year = yearly.index.max() if len(yearly) > 0 else None
+    latest_year_revenue = yearly.loc[latest_year] if latest_year is not None else 0
+    avg_yoy = yoy.dropna().mean() if len(yoy.dropna()) > 0 else np.nan
+
+    st.markdown("<div class='section-title'>Core KPIs</div>", unsafe_allow_html=True)
     k1, k2, k3, k4 = st.columns(4)
     k1.markdown(f"<div class='kpi'>Total Revenue<br/>₹{total_revenue:,.0f}</div>", unsafe_allow_html=True)
-    if not np.isnan(unique_students):
-        k2.markdown(f"<div class='kpi'>Unique Batches<br/>{int(unique_students)}</div>", unsafe_allow_html=True)
+    if latest_year is not None:
+        k2.markdown(f"<div class='kpi'>Latest Year<br/>{int(latest_year)}</div>", unsafe_allow_html=True)
+        k3.markdown(f"<div class='kpi'>Latest Year Revenue<br/>₹{latest_year_revenue:,.0f}</div>", unsafe_allow_html=True)
     else:
-        k2.markdown(f"<div class='kpi'>Unique Batches<br/>N/A</div>", unsafe_allow_html=True)
-    k3.markdown(f"<div class='kpi'>Latest Year Revenue<br/>₹{latest_year_revenue:,.0f}</div>", unsafe_allow_html=True)
-    if len(yoy.dropna()) > 0:
-        k4.markdown(f"<div class='kpi'>Avg YoY Growth<br/>{yoy.dropna().mean():.2f}%</div>", unsafe_allow_html=True)
+        k2.markdown(f"<div class='kpi'>Latest Year<br/>N/A</div>", unsafe_allow_html=True)
+        k3.markdown(f"<div class='kpi'>Latest Year Revenue<br/>N/A</div>", unsafe_allow_html=True)
+    if not np.isnan(avg_yoy):
+        k4.markdown(f"<div class='kpi'>Avg YoY Growth<br/>{avg_yoy:.2f}%</div>", unsafe_allow_html=True)
     else:
         k4.markdown(f"<div class='kpi'>Avg YoY Growth<br/>N/A</div>", unsafe_allow_html=True)
 
+    st.markdown("---")
+
     # -----------------------------------------------------
-    # INVESTOR MODEL (5-YEAR PROJECTION BASED ON LATEST YEAR)
+    # INVESTOR MODEL (5-YEAR)
     # -----------------------------------------------------
     st.markdown("<div class='section-title'>Investor Projection & Valuation Model</div>", unsafe_allow_html=True)
 
@@ -519,18 +507,18 @@ with tab3:
 
     if st.button("Run 5-Year Projection & Investor Outcome"):
 
-        years = np.arange(1, 6)
+        years_proj = np.arange(1, 6)
         rev_proj = []
         ebit_proj = []
         cur = base_revenue
 
-        for _ in years:
+        for _ in years_proj:
             rev_proj.append(cur)
             ebit_proj.append(cur * ebitda_margin)
             cur *= (1 + growth_rate)
 
         df_proj = pd.DataFrame({
-            "Year": years,
+            "Year": years_proj,
             "Revenue (₹)": rev_proj,
             "EBITDA (₹)": ebit_proj,
             "Valuation (₹)": np.array(ebit_proj) * exit_multiple
@@ -557,18 +545,19 @@ with tab3:
         else:
             k4.markdown(f"<div class='kpi'>IRR<br/>N/A</div>", unsafe_allow_html=True)
 
-        # Chart: revenue vs EBITDA
         st.write("### Revenue vs EBITDA Projection")
-        fig2, ax = plt.subplots(figsize=(10,5))
-        ax.bar(df_proj["Year"], df_proj["Revenue (₹)"], label="Revenue (₹)", alpha=0.7)
-        ax.plot(df_proj["Year"], df_proj["EBITDA (₹)"], color="red", marker="o", label="EBITDA (₹)")
-        plt.grid(True, alpha=0.3)
-        plt.legend()
+        fig2, ax2 = plt.subplots(figsize=(11,5))
+        ax2.bar(df_proj["Year"], df_proj["Revenue (₹)"], label="Revenue (₹)", alpha=0.7)
+        ax2.plot(df_proj["Year"], df_proj["EBITDA (₹)"], color="red", marker="o", label="EBITDA (₹)")
+        ax2.set_xlabel("Year")
+        ax2.set_ylabel("Amount (₹)")
+        ax2.grid(alpha=0.3)
+        ax2.legend()
         st.pyplot(fig2)
 
-        # ------------------------
-        # COMPETITOR COMPARISON
-        # ------------------------
+        # -------------------------------------------------
+        # COMPETITOR COMPARISON (STATIC)
+        # -------------------------------------------------
         st.markdown("<div class='section-title'>Competitor Comparison (Static Benchmarks)</div>", unsafe_allow_html=True)
 
         competitors = pd.DataFrame({
@@ -607,66 +596,30 @@ with tab3:
         fig3.update_layout(yaxis_title="Revenue (₹ Cr)")
         st.plotly_chart(fig3, use_container_width=True)
 
-        # ------------------------
+        # -------------------------------------------------
         # AUTOMATED INSIGHTS
-        # ------------------------
+        # -------------------------------------------------
         st.markdown("<div class='section-title'>Automated Insights</div>", unsafe_allow_html=True)
 
         insights = []
 
         if len(mom.dropna()) > 0 and mom.dropna().mean() > 5:
-            insights.append("Your average MoM growth is strong, indicating healthy short-term momentum in revenue.")
+            insights.append("Your average MoM growth is strong, indicating healthy short-term demand.")
 
         if len(yoy.dropna()) > 0 and yoy.dropna().mean() > 20:
-            insights.append("Your YoY growth is above typical EdTech benchmarks, which is attractive for investors.")
+            insights.append("Your YoY growth is above typical EdTech benchmarks, which is attractive to investors.")
 
         if ebitda_margin >= 0.25:
-            insights.append("EBITDA margins at or above 25% signal a lean cost structure and strong unit economics.")
+            insights.append("EBITDA margin ≥ 25% signals strong cost discipline and good unit economics.")
 
         if growth_rate > competitors["YoY_Growth"].median():
-            insights.append("Your assumed forward growth rate is higher than most key market players, positioning you as a high-growth asset.")
+            insights.append("Your assumed growth rate is higher than major competitors, positioning you as a high-growth asset.")
 
         if terminal_value < base_revenue * 2:
-            insights.append("Terminal value is not very aggressive relative to base revenue; consider validating your multiple or growth assumptions.")
+            insights.append("Terminal value isn't very aggressive vs Year 1 revenue. Consider validating your growth or multiple assumptions.")
 
         if not insights:
-            insights.append("No major red flags or standout strengths detected. Your assumptions look moderate and stable.")
+            insights.append("No unusual red flags or outliers in your current assumptions. The model looks balanced.")
 
         for text in insights:
             st.markdown(f"<div class='card'>{text}</div>", unsafe_allow_html=True)
-
-        # ------------------------
-        # PDF DOWNLOAD (if pdfkit available)
-        # ------------------------
-        st.markdown("<div class='section-title'>Download Summary</div>", unsafe_allow_html=True)
-
-        if PDFKIT_AVAILABLE:
-            if st.button("Generate & Download PDF Summary"):
-                html = f"""
-                <h1>EdTech Financial Summary</h1>
-                <h2>Key Numbers</h2>
-                <p><b>Total Revenue (data):</b> ₹{total_revenue:,.0f}</p>
-                <p><b>Base Revenue (Year 1):</b> ₹{base_revenue:,.0f}</p>
-                <p><b>Terminal Value:</b> ₹{terminal_value:,.0f}</p>
-                <p><b>Investor Payout:</b> ₹{investor_payout:,.0f}</p>
-                <p><b>ROI:</b> {roi*100:.2f}%</p>
-                <p><b>IRR:</b> {irr*100:.2f}%</p>
-                <h2>Insights</h2>
-                <ul>
-                {''.join([f'<li>{ins}</li>' for ins in insights])}
-                </ul>
-                """
-
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
-                    pdfkit.from_string(html, tmpfile.name)
-                    tmpfile.seek(0)
-                    pdf_bytes = tmpfile.read()
-
-                st.download_button(
-                    "Download PDF",
-                    data=pdf_bytes,
-                    file_name="EdTech_Financial_Summary.pdf",
-                    mime="application/pdf"
-                )
-        else:
-            st.info("pdfkit not available. Install pdfkit & wkhtmltopdf on server to enable PDF export.")

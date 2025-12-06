@@ -4,6 +4,19 @@ import numpy as np
 import numpy_financial as nf
 import plotly.graph_objects as go
 
+# Header & Logo
+# -------------------------
+logo_url = "https://raw.githubusercontent.com/Analytics-Avenue/streamlit-dataapp/main/logo.png"
+st.markdown(f"""
+<div style="display: flex; align-items: center; margin-bottom:16px;">
+    <img src="{logo_url}" width="60" style="margin-right:12px;">
+    <div style="line-height:1;">
+        <div style="color:#064b86; font-size:36px; font-weight:700;">Analytics Avenue &</div>
+        <div style="color:#064b86; font-size:36px; font-weight:700;">Advanced Analytics</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 # =========================================================
 # PAGE CONFIG
 # =========================================================

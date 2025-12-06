@@ -137,8 +137,8 @@ def combo_chart_plotly(df, x_col, bar_col, line_col, title, line_suffix="%"):
         fig.update_layout(title=title, template="plotly_white")
         return fig
 
-    # Color bars green if trend positive, red if negative
-    # If line_col is all 0/NaN, default to blue bars
+    # Color bars green if trend positive, red if negative.
+    # If line_col is all 0/NaN, default to blue bars.
     if df[line_col].notna().any():
         colors = [
             "#2ecc71" if v >= 0 else "#e74c3c"
@@ -226,8 +226,8 @@ with tab1:
     st.markdown("<div class='section-title'>Overview</div>", unsafe_allow_html=True)
     st.markdown("""
     <div class="card">
-    This app connects your student fee collection data to **financial insights**:
-    revenue trends, MoM / QoQ / YoY growth, and a simple 5-year investor model with EBITDA, ROI, and IRR.
+    This app connects your student fee collection data to <b>financial insights</b>:
+    revenue trends, MoM / QoQ / YoY growth, and a simple N-year investor model with EBITDA, ROI, and IRR.
     </div>
     """, unsafe_allow_html=True)
 
@@ -239,9 +239,9 @@ with tab1:
         • Load data from Google Sheets or CSV<br>
         • See monthly, quarterly, annual revenue splits<br>
         • Calculate MoM, QoQ, YoY growth %<br>
-        • Run a 5-year projection (Revenue + EBITDA)<br>
+        • Run an N-year projection (Revenue + EBITDA)<br>
         • Calculate Terminal Value, ROI, IRR<br>
-        • Compare against static EdTech benchmarks
+        • Compare against static EdTech assumptions
         </div>
         """, unsafe_allow_html=True)
     with c2:
@@ -407,6 +407,43 @@ with tab3:
     st.dataframe(df.head(), width="stretch")
 
     # =========================================================
+    # GLOBAL FILTERS (Month / Quarter / Year)
+    # =========================================================
+    st.markdown("<div class='section-title'>Filters</div>", unsafe_allow_html=True)
+
+    df["month_num"] = df["first_payment_date"].dt.month
+    df["quarter_num"] = df["first_payment_date"].dt.quarter
+    df["year_num"] = df["first_payment_date"].dt.year
+
+    min_month, max_month = int(df["month_num"].min()), int(df["month_num"].max())
+    min_q, max_q = int(df["quarter_num"].min()), int(df["quarter_num"].max())
+    min_y, max_y = int(df["year_num"].min()), int(df["year_num"].max())
+
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        month_range = st.slider("Month range", min_month, max_month, (min_month, max_month))
+    with col_f2:
+        quarter_range = st.slider("Quarter range", min_q, max_q, (min_q, max_q))
+    with col_f3:
+        year_range = st.slider("Year range", min_y, max_y, (min_y, max_y))
+
+    df = df[
+        (df["month_num"].between(month_range[0], month_range[1])) &
+        (df["quarter_num"].between(quarter_range[0], quarter_range[1])) &
+        (df["year_num"].between(year_range[0], year_range[1]))
+    ]
+
+    # If filters removed everything
+    if df.empty:
+        st.warning("No data available for the selected filter range.")
+        st.stop()
+
+    # Recompute period columns after filtering (just to be safe)
+    df["year"] = df["first_payment_date"].dt.year
+    df["month_period"] = df["first_payment_date"].dt.to_period("M").astype(str)
+    df["quarter_period"] = df["first_payment_date"].dt.to_period("Q").astype(str)
+
+    # =========================================================
     # MONTHLY REVENUE + MoM
     # =========================================================
     st.markdown("<div class='section-title'>Monthly Revenue</div>", unsafe_allow_html=True)
@@ -414,7 +451,7 @@ with tab3:
     monthly = df.groupby("month_period")["collected_amount"].sum().reset_index()
     monthly.rename(columns={"collected_amount": "Revenue (₹)"}, inplace=True)
 
-    st.write("### Monthly Revenue (Table)")
+    st.write("### Table View")
     st.dataframe(monthly.style.format({"Revenue (₹)": "{:,.2f}"}), width="stretch")
 
     monthly["MoM %"] = monthly["Revenue (₹)"].pct_change() * 100
@@ -438,7 +475,7 @@ with tab3:
     quarterly = df.groupby("quarter_period")["collected_amount"].sum().reset_index()
     quarterly.rename(columns={"collected_amount": "Revenue (₹)"}, inplace=True)
 
-    st.write("### Quarterly Revenue (Table)")
+    st.write("### Table View")
     st.dataframe(quarterly.style.format({"Revenue (₹)": "{:,.2f}"}), width="stretch")
 
     quarterly["QoQ %"] = quarterly["Revenue (₹)"].pct_change() * 100
@@ -462,7 +499,7 @@ with tab3:
     yearly = df.groupby("year")["collected_amount"].sum().reset_index()
     yearly.rename(columns={"collected_amount": "Revenue (₹)"}, inplace=True)
 
-    st.write("### Annual Revenue (Table)")
+    st.write("### Table View")
     st.dataframe(yearly.style.format({"Revenue (₹)": "{:,.2f}"}), width="stretch")
 
     yearly["YoY %"] = yearly["Revenue (₹)"].pct_change() * 100
@@ -492,24 +529,68 @@ with tab3:
     k3.markdown(f"<div class='kpi'>Months of Data<br/>{len(monthly)}</div>", unsafe_allow_html=True)
 
     # =========================================================
-    # INVESTOR PROJECTION (5-YEAR) + COMBO CHART
+    # INVESTOR PROJECTION (N-YEAR) + COMBO CHART
     # =========================================================
     st.markdown("<div class='section-title'>Investor Model</div>", unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        base_rev = st.number_input("Base Revenue (₹)", value=float(total_rev), step=100000.0)
-        growth = st.number_input("YoY Growth (0.25 = 25%)", value=0.25, min_value=0.0, max_value=1.0)
-        ebitda_margin = st.number_input("EBITDA Margin (0.26 = 26%)", value=0.26, min_value=0.0, max_value=1.0)
+        base_rev = st.number_input(
+            "Base Revenue for Projection (₹)",
+            value=float(total_rev),
+            min_value=0.0,
+            step=50000.0
+        )
+        growth_pct = st.number_input(
+            "Expected YoY Growth (%)",
+            min_value=-50.0,
+            max_value=200.0,
+            value=25.0
+        )
+        growth = growth_pct / 100.0
+
+        ebitda_pct = st.number_input(
+            "EBITDA Margin (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=26.0
+        )
+        ebitda_margin = ebitda_pct / 100.0
+
+        projection_years = st.number_input(
+            "Number of Projection Years (N)",
+            min_value=1,
+            max_value=20,
+            value=5,
+            step=1
+        )
 
     with c2:
-        invest = st.number_input("Investment (₹)", value=1000000.0, step=100000.0)
-        equity = st.number_input("Equity % (0.20 = 20%)", value=0.20, min_value=0.0, max_value=1.0)
-        multiple = st.number_input("Exit Multiple (X)", value=6.0, min_value=1.0, max_value=20.0)
+        invest = st.number_input(
+            "Investment (₹)",
+            value=1000000.0,
+            step=100000.0,
+            min_value=0.0
+        )
+        equity_pct = st.number_input(
+            "Equity Stake (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=20.0
+        )
+        equity = equity_pct / 100.0
+
+        multiple = st.number_input(
+            "Exit EBITDA Multiple (X)",
+            value=6.0,
+            min_value=1.0,
+            max_value=30.0,
+            step=0.5
+        )
 
     if st.button("Run Projection"):
 
-        years_proj = np.arange(1, 6)
+        years_proj = np.arange(1, int(projection_years) + 1)
         rev_list = []
         ebit_list = []
         cur = base_rev
@@ -517,7 +598,7 @@ with tab3:
         for _ in years_proj:
             rev_list.append(cur)
             ebit_list.append(cur * ebitda_margin)
-            cur *= (1 + growth)
+            cur = cur * (1 + growth)
 
         proj = pd.DataFrame({
             "Year": years_proj,
@@ -526,19 +607,23 @@ with tab3:
         })
         proj["Valuation (₹)"] = proj["EBITDA (₹)"] * multiple
 
-        st.write("### 5-Year Projection (Table)")
+        st.write("### Projection Table")
         st.dataframe(proj.style.format("{:,.2f}"), width="stretch")
 
         # Build chart using EBITDA% as line
         proj_for_chart = proj.copy()
-        proj_for_chart["EBITDA %"] = (proj_for_chart["EBITDA (₹)"] / proj_for_chart["Revenue (₹)"]) * 100
+        proj_for_chart["EBITDA %"] = np.where(
+            proj_for_chart["Revenue (₹)"] > 0,
+            (proj_for_chart["EBITDA (₹)"] / proj_for_chart["Revenue (₹)"]) * 100,
+            0
+        )
 
         fig_proj = combo_chart_plotly(
             proj_for_chart,
             x_col="Year",
             bar_col="Revenue (₹)",
             line_col="EBITDA %",
-            title="Revenue + EBITDA% Projection (5 Years)",
+            title="Revenue + EBITDA% Projection",
             line_suffix="%"
         )
         st.plotly_chart(fig_proj, width="stretch")
@@ -546,7 +631,10 @@ with tab3:
         terminal = proj["Valuation (₹)"].iloc[-1]
         payout = terminal * equity
         roi = (payout - invest) / invest if invest > 0 else 0
-        irr = nf.irr([-invest, 0, 0, 0, payout]) if invest > 0 else 0
+        try:
+            irr = nf.irr([-invest] + [0] * (len(years_proj) - 1) + [payout]) if invest > 0 else 0
+        except Exception:
+            irr = 0
 
         st.markdown("<div class='section-title'>Investor Outcome</div>", unsafe_allow_html=True)
         k1, k2, k3, k4 = st.columns(4)
@@ -554,8 +642,6 @@ with tab3:
         k2.markdown(f"<div class='kpi'>Payout<br/>₹{payout:,.0f}</div>", unsafe_allow_html=True)
         k3.markdown(f"<div class='kpi'>ROI<br/>{roi*100:.2f}%</div>", unsafe_allow_html=True)
         k4.markdown(f"<div class='kpi'>IRR<br/>{irr*100:.2f}%</div>", unsafe_allow_html=True)
-
-        
 
         # =====================================================
         # AUTOMATED INSIGHTS
@@ -571,13 +657,19 @@ with tab3:
             insights.append("Your YoY growth is strong compared to typical EdTech benchmarks (>20%).")
 
         if ebitda_margin >= 0.25:
-            insights.append("EBITDA margin ≥ 25% indicates a lean cost structure and strong unit economics.")
+            insights.append("EBITDA margin ≥ 25% indicates a lean, high-margin operating model.")
+
+        if growth > 0.35:
+            insights.append("YoY growth assumption > 35% is very aggressive. Validate with pipeline + capacity.")
 
         if terminal < base_rev * 2:
-            insights.append("Terminal value isn't very aggressive vs Year 1 revenue. Consider revisiting growth or multiples with investors.")
+            insights.append("Terminal value is not very aggressive vs Year-1 revenue. You may be under-selling upside.")
+
+        if invest > 0 and roi < 1:
+            insights.append("ROI < 100% suggests the equity + multiple combination may not be attractive enough for investors.")
 
         if not insights:
-            insights.append("No extreme risks or standout strengths detected. Your assumption set looks moderate and defensible.")
+            insights.append("No major red flags. Your assumptions look moderate and defensible for a seed/early-stage pitch.")
 
         for i in insights:
             st.markdown(f"<div class='card'>{i}</div>", unsafe_allow_html=True)

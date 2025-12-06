@@ -315,58 +315,110 @@ with tab3:
     st.markdown("<div class='section-title'>Step 2: Data Snapshot</div>", unsafe_allow_html=True)
     st.dataframe(df_rev.head(10), use_container_width=True)
 
+
     # -----------------------------------------------------
-    # REVENUE AGGREGATIONS + GROWTH (MoM / QoQ / YoY)
+    # CLEAN & ORDERED REVENUE + GROWTH ANALYTICS
     # -----------------------------------------------------
+    
     st.markdown("<div class='section-title'>Revenue & Growth Analytics</div>", unsafe_allow_html=True)
-
-    monthly = df_rev.groupby("month_period")["collected_amount"].sum().sort_index()
-    quarterly = df_rev.groupby("quarter_period")["collected_amount"].sum().sort_index()
-    yearly = df_rev.groupby("year")["collected_amount"].sum().sort_index()
-
-    mom = monthly.pct_change() * 100
-    qoq = quarterly.pct_change() * 100
-    yoy = yearly.pct_change() * 100
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.write("**Monthly Revenue (₹)**")
-        st.dataframe(monthly.to_frame("revenue").style.format("{:,.2f}"), use_container_width=True)
-        st.write("**MoM Growth (%)**")
-        st.dataframe(mom.to_frame("MoM %").style.format("{:.2f}"), use_container_width=True)
-    with c2:
-        st.write("**Quarterly Revenue (₹)**")
-        st.dataframe(quarterly.to_frame("revenue").style.format("{:,.2f}"), use_container_width=True)
-        st.write("**QoQ Growth (%)**")
-        st.dataframe(qoq.to_frame("QoQ %").style.format("{:.2f}"), use_container_width=True)
-
-    st.write("**Annual Revenue (₹)**")
-    st.dataframe(yearly.to_frame("revenue").style.format("{:,.2f}"), use_container_width=True)
-    st.write("**YoY Growth (%)**")
-    st.dataframe(yoy.to_frame("YoY %").style.format("{:.2f}"), use_container_width=True)
-
-    # -----------------------------------------------------
-    # MoM Trend Chart (Revenue + Growth)
-    # -----------------------------------------------------
-    st.markdown("<div class='section-title'>Monthly Revenue vs MoM Growth</div>", unsafe_allow_html=True)
-    if len(monthly) > 1:
-        fig, ax1 = plt.subplots(figsize=(10,5))
-        ax1.bar(monthly.index.astype(str), monthly.values, alpha=0.7)
-        ax1.set_ylabel("Revenue (₹)", color="#064b86")
-        ax1.tick_params(axis='y', labelcolor="#064b86")
-
-        ax2 = ax1.twinx()
-        ax2.plot(monthly.index.astype(str), mom.values, color="red", marker="o", linewidth=2)
-        ax2.set_ylabel("Growth % (MoM)", color="red")
-        ax2.tick_params(axis='y', labelcolor="red")
-
-        plt.xticks(rotation=45)
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        st.pyplot(fig)
-    else:
-        st.info("Need at least 2 months of data for MoM chart.")
-
+    
+    # --- Monthly Revenue Table ---
+    st.markdown("### Monthly Revenue (Table)")
+    monthly_df = monthly.to_frame("Revenue (₹)").reset_index()
+    monthly_df["month_period"] = monthly_df["month_period"].astype(str)
+    st.dataframe(monthly_df.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
+    
+    st.markdown("### Monthly Revenue Trend Chart")
+    fig1, ax1 = plt.subplots(figsize=(11,5))
+    ax1.plot(monthly_df["month_period"], monthly_df["Revenue (₹)"], marker="o", color="#064b86")
+    ax1.set_xlabel("Month")
+    ax1.set_ylabel("Revenue (₹)")
+    ax1.grid(alpha=0.3)
+    plt.xticks(rotation=45)
+    st.pyplot(fig1)
+    
+    st.markdown("---")
+    
+    # --- MoM Growth Table ---
+    st.markdown("### MoM Growth (%)")
+    mom_df = mom.to_frame("MoM %").reset_index()
+    mom_df["month_period"] = mom_df["month_period"].astype(str)
+    st.dataframe(mom_df.style.format({"MoM %": "{:.2f}"}), use_container_width=True)
+    
+    st.markdown("### MoM Growth Trend Chart")
+    fig1b, ax1b = plt.subplots(figsize=(11,5))
+    ax1b.bar(mom_df["month_period"], mom_df["MoM %"], color="#ff6b6b", alpha=0.8)
+    ax1b.set_xlabel("Month")
+    ax1b.set_ylabel("MoM Growth %")
+    ax1b.grid(alpha=0.3)
+    plt.xticks(rotation=45)
+    st.pyplot(fig1b)
+    
+    st.markdown("---")
+    
+    # --- Quarterly Revenue Table ---
+    st.markdown("### Quarterly Revenue (Table)")
+    quarterly_df = quarterly.to_frame("Revenue (₹)").reset_index()
+    quarterly_df["quarter_period"] = quarterly_df["quarter_period"].astype(str)
+    st.dataframe(quarterly_df.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
+    
+    st.markdown("### Quarterly Revenue Trend Chart")
+    fig2, ax2 = plt.subplots(figsize=(11,5))
+    ax2.bar(quarterly_df["quarter_period"], quarterly_df["Revenue (₹)"], color="#064b86")
+    ax2.set_xlabel("Quarter")
+    ax2.set_ylabel("Revenue (₹)")
+    ax2.grid(alpha=0.3)
+    plt.xticks(rotation=45)
+    st.pyplot(fig2)
+    
+    st.markdown("---")
+    
+    # --- QoQ Growth Table ---
+    st.markdown("### QoQ Growth (%)")
+    qoq_df = qoq.to_frame("QoQ %").reset_index()
+    qoq_df["quarter_period"] = qoq_df["quarter_period"].astype(str)
+    st.dataframe(qoq_df.style.format({"QoQ %": "{:.2f}"}), use_container_width=True)
+    
+    st.markdown("### QoQ Growth Trend Chart")
+    fig2b, ax2b = plt.subplots(figsize=(11,5))
+    ax2b.plot(qoq_df["quarter_period"], qoq_df["QoQ %"], marker="o", linewidth=2, color="red")
+    ax2b.set_xlabel("Quarter")
+    ax2b.set_ylabel("QoQ Growth %")
+    ax2b.grid(alpha=0.3)
+    plt.xticks(rotation=45)
+    st.pyplot(fig2b)
+    
+    st.markdown("---")
+    
+    # --- Annual Revenue Table ---
+    st.markdown("### Annual Revenue (Table)")
+    yearly_df = yearly.to_frame("Revenue (₹)").reset_index()
+    st.dataframe(yearly_df.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
+    
+    st.markdown("### Annual Revenue Bar Chart")
+    fig3, ax3 = plt.subplots(figsize=(11,5))
+    ax3.bar(yearly_df["year"], yearly_df["Revenue (₹)"], color="#064b86")
+    ax3.set_xlabel("Year")
+    ax3.set_ylabel("Revenue (₹)")
+    ax3.grid(alpha=0.3)
+    st.pyplot(fig3)
+    
+    st.markdown("---")
+    
+    # --- YoY Growth Table ---
+    st.markdown("### YoY Growth (%)")
+    yoy_df = yoy.to_frame("YoY %").reset_index()
+    st.dataframe(yoy_df.style.format({"YoY %": "{:.2f}"}), use_container_width=True)
+    
+    st.markdown("### YoY Growth Trend Chart")
+    fig3b, ax3b = plt.subplots(figsize=(11,5))
+    ax3b.plot(yoy_df["year"], yoy_df["YoY %"], marker="o", color="red")
+    ax3b.set_xlabel("Year")
+    ax3b.set_ylabel("YoY Growth %")
+    ax3b.grid(alpha=0.3)
+    st.pyplot(fig3b)
+    
+    st.markdown("---")
     # -----------------------------------------------------
     # BASIC COMPANY KPIs FROM DATA
     # -----------------------------------------------------

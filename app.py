@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import numpy_financial as nf
-import matplotlib.pyplot as plt
 import plotly.express as px
+import plotly.graph_objects as go
 
-# ========================================================
+# =========================================================
 # PAGE CONFIG
 # =========================================================
 st.set_page_config(
@@ -115,109 +115,97 @@ body, [class*="css"] { color:#000 !important; font-size:16px; }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# COMBO CHART HELPER (RED/GREEN BARS + LABELS)
+# PLOTLY COMBO CHART HELPER (BAR + LINE, GREEN/RED TREND)
 # =========================================================
-def combo_chart(df, x_col, bar_col, line_col, title):
+def combo_chart_plotly(df, x_col, bar_col, line_col, title, line_suffix="%"):
     """
-    df      : DataFrame
-    x_col   : column for x-axis (categories)
-    bar_col : numeric column for bar values
-    line_col: numeric column for line values (typically %)
+    df: DataFrame
+    x_col: x-axis (category)
+    bar_col: bar values (e.g. Revenue)
+    line_col: line values (e.g. MoM %, QoQ %, YoY %)
+    title: chart title
+    line_suffix: "%" for percentages, "" for plain numbers
     """
 
-    # Safety: handle empty or single-row df
     if df.empty:
-        fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, "No data", ha="center", va="center")
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No data",
+            x=0.5, y=0.5,
+            showarrow=False
+        )
+        fig.update_layout(title=title, template="plotly_white")
         return fig
 
-    # Dynamic bar color based on positive/negative
-    colors = df[bar_col].apply(
-        lambda x: "#2ecc71" if x >= 0 else "#e74c3c"  # green / red
-    )
+    # Color bars green if trend positive, red if negative
+    # If line_col is all 0/NaN, default to blue bars
+    if df[line_col].notna().any():
+        colors = [
+            "#2ecc71" if v >= 0 else "#e74c3c"
+            for v in df[line_col].fillna(0)
+        ]
+    else:
+        colors = ["#3498db"] * len(df)
 
-    fig, ax1 = plt.subplots(figsize=(12, 5))
+    fig = go.Figure()
 
-    # --- BAR CHART (LEFT AXIS) ---
-    bars = ax1.bar(
-        df[x_col],
-        df[bar_col],
-        color=colors,
-        alpha=0.85,
-        width=0.60,
-        label=bar_col
-    )
-    ax1.set_ylabel(bar_col, color="#000")
-    ax1.grid(axis="y", linestyle="--", alpha=0.3)
-
-    # Offsets
-    max_bar = df[bar_col].max()
-    bar_offset = 0.02 * (max_bar if max_bar != 0 else 1)
-
-    # Add value labels above/below bars
-    for bar in bars:
-        height = bar.get_height()
-        if height >= 0:
-            y_pos = height + bar_offset
-            va = "bottom"
-        else:
-            y_pos = height - bar_offset
-            va = "top"
-        ax1.text(
-            bar.get_x() + bar.get_width() / 2,
-            y_pos,
-            f"{height:,.0f}",
-            ha="center",
-            va=va,
-            fontsize=9,
-            color="#000"
+    # --- Bar trace (Revenue or main metric) ---
+    fig.add_trace(
+        go.Bar(
+            x=df[x_col],
+            y=df[bar_col],
+            name=bar_col,
+            marker_color=colors,
+            yaxis="y1",
+            hovertemplate=f"{bar_col}: %{{y:,.0f}}<extra></extra>"
         )
-
-    # --- LINE CHART (RIGHT AXIS) ---
-    ax2 = ax1.twinx()
-    ax2.plot(
-        df[x_col],
-        df[line_col],
-        color="#2980b9",
-        marker="o",
-        linewidth=2.5,
-        markersize=7,
-        label=line_col
     )
-    ax2.set_ylabel(line_col, color="#2980b9")
-    ax2.tick_params(axis="y", labelcolor="#2980b9")
 
-    # Offset for line labels
-    max_line = np.nanmax(np.abs(df[line_col])) if len(df[line_col].dropna()) else 0
-    line_offset = 0.02 * (max_line if max_line != 0 else 1)
-
-    # Show line labels above/below points
-    for i, val in enumerate(df[line_col]):
-        if np.isnan(val):
-            continue
-        if val >= 0:
-            y_pos = val + line_offset
-            va = "bottom"
-        else:
-            y_pos = val - line_offset
-            va = "top"
-        ax2.text(
-            i,
-            y_pos,
-            f"{val:,.1f}%",
-            color="#2980b9",
-            ha="center",
-            va=va,
-            fontsize=9
+    # --- Line trace (Growth %) ---
+    fig.add_trace(
+        go.Scatter(
+            x=df[x_col],
+            y=df[line_col],
+            name=line_col,
+            mode="lines+markers+text",
+            text=[f"{v:.1f}{line_suffix}" if pd.notna(v) else "" for v in df[line_col]],
+            textposition="top center",
+            line=dict(color="#2980b9", width=2),
+            marker=dict(size=7),
+            yaxis="y2",
+            hovertemplate=f"{line_col}: %{{y:.2f}}{line_suffix}<extra></extra>"
         )
+    )
 
-    # Title formatting
-    plt.title(title, fontsize=14, fontweight="bold")
+    fig.update_layout(
+        title=title,
+        template="plotly_white",
+        xaxis=dict(
+            title=x_col,
+            tickangle=-45
+        ),
+        yaxis=dict(
+            title=bar_col,
+            showgrid=True,
+            gridcolor="rgba(0,0,0,0.1)"
+        ),
+        yaxis2=dict(
+            title=line_col,
+            overlaying="y",
+            side="right",
+            showgrid=False
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0
+        ),
+        margin=dict(l=40, r=40, t=60, b=90),
+        bargap=0.2
+    )
 
-    # X-label rotation
-    plt.xticks(rotation=45, ha="right")
-
-    fig.tight_layout()
     return fig
 
 # =========================================================
@@ -296,7 +284,7 @@ with tab2:
     df_gloss = pd.DataFrame(
         [{"Field": k, "Description": v} for k, v in desc_map.items()]
     )
-    st.dataframe(df_gloss, use_container_width=True)
+    st.dataframe(df_gloss, width="stretch")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -352,7 +340,7 @@ with tab3:
                 df_tmp.columns = df_tmp.columns.str.strip().str.lower().str.replace(" ", "_")
 
                 st.success("Google Sheet loaded.")
-                st.dataframe(df_tmp.head(), use_container_width=True)
+                st.dataframe(df_tmp.head(), width="stretch")
                 df_rev = df_tmp.copy()
 
             except Exception as e:
@@ -369,7 +357,7 @@ with tab3:
             raw.columns = raw.columns.str.strip().str.lower().str.replace(" ", "_")
 
             st.write("Preview of uploaded file:")
-            st.dataframe(raw.head(), use_container_width=True)
+            st.dataframe(raw.head(), width="stretch")
 
             st.write("Map your columns to the required fields:")
             mapping = {}
@@ -389,7 +377,7 @@ with tab3:
                     mapped = raw.rename(columns=inv)
                     df_rev = mapped.copy()
                     st.success("Mapping applied.")
-                    st.dataframe(df_rev.head(), use_container_width=True)
+                    st.dataframe(df_rev.head(), width="stretch")
 
     # -----------------------------
     # BLOCK IF NO DATA
@@ -416,7 +404,7 @@ with tab3:
     df["quarter_period"] = df["first_payment_date"].dt.to_period("Q").astype(str)
 
     st.markdown("<div class='section-title'>Step 2: Data Snapshot</div>", unsafe_allow_html=True)
-    st.dataframe(df.head(), use_container_width=True)
+    st.dataframe(df.head(), width="stretch")
 
     # =========================================================
     # MONTHLY REVENUE + MoM
@@ -427,19 +415,20 @@ with tab3:
     monthly.rename(columns={"collected_amount": "Revenue (₹)"}, inplace=True)
 
     st.write("### Monthly Revenue (Table)")
-    st.dataframe(monthly.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
+    st.dataframe(monthly.style.format({"Revenue (₹)": "{:,.2f}"}), width="stretch")
 
     monthly["MoM %"] = monthly["Revenue (₹)"].pct_change() * 100
     monthly["MoM %"] = monthly["MoM %"].fillna(0)
 
-    fig_m = combo_chart(
+    fig_m = combo_chart_plotly(
         monthly,
         x_col="month_period",
         bar_col="Revenue (₹)",
         line_col="MoM %",
-        title="Monthly Revenue + MoM Growth"
+        title="Monthly Revenue + MoM Growth",
+        line_suffix="%"
     )
-    st.pyplot(fig_m)
+    st.plotly_chart(fig_m, width="stretch")
 
     # =========================================================
     # QUARTERLY REVENUE + QoQ
@@ -450,19 +439,20 @@ with tab3:
     quarterly.rename(columns={"collected_amount": "Revenue (₹)"}, inplace=True)
 
     st.write("### Quarterly Revenue (Table)")
-    st.dataframe(quarterly.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
+    st.dataframe(quarterly.style.format({"Revenue (₹)": "{:,.2f}"}), width="stretch")
 
     quarterly["QoQ %"] = quarterly["Revenue (₹)"].pct_change() * 100
     quarterly["QoQ %"] = quarterly["QoQ %"].fillna(0)
 
-    fig_q = combo_chart(
+    fig_q = combo_chart_plotly(
         quarterly,
         x_col="quarter_period",
         bar_col="Revenue (₹)",
         line_col="QoQ %",
-        title="Quarterly Revenue + QoQ Growth"
+        title="Quarterly Revenue + QoQ Growth",
+        line_suffix="%"
     )
-    st.pyplot(fig_q)
+    st.plotly_chart(fig_q, width="stretch")
 
     # =========================================================
     # ANNUAL REVENUE + YoY
@@ -473,19 +463,20 @@ with tab3:
     yearly.rename(columns={"collected_amount": "Revenue (₹)"}, inplace=True)
 
     st.write("### Annual Revenue (Table)")
-    st.dataframe(yearly.style.format({"Revenue (₹)": "{:,.2f}"}), use_container_width=True)
+    st.dataframe(yearly.style.format({"Revenue (₹)": "{:,.2f}"}), width="stretch")
 
     yearly["YoY %"] = yearly["Revenue (₹)"].pct_change() * 100
     yearly["YoY %"] = yearly["YoY %"].fillna(0)
 
-    fig_y = combo_chart(
+    fig_y = combo_chart_plotly(
         yearly,
         x_col="year",
         bar_col="Revenue (₹)",
         line_col="YoY %",
-        title="Annual Revenue + YoY Growth"
+        title="Annual Revenue + YoY Growth",
+        line_suffix="%"
     )
-    st.pyplot(fig_y)
+    st.plotly_chart(fig_y, width="stretch")
 
     # =========================================================
     # CORE KPIs
@@ -536,20 +527,21 @@ with tab3:
         proj["Valuation (₹)"] = proj["EBITDA (₹)"] * multiple
 
         st.write("### 5-Year Projection (Table)")
-        st.dataframe(proj.style.format("{:,.2f}"), use_container_width=True)
+        st.dataframe(proj.style.format("{:,.2f}"), width="stretch")
 
-        # For combo_chart, treat EBITDA as line (not % but still fine visually)
+        # Build chart using EBITDA% as line
         proj_for_chart = proj.copy()
         proj_for_chart["EBITDA %"] = (proj_for_chart["EBITDA (₹)"] / proj_for_chart["Revenue (₹)"]) * 100
 
-        fig_proj = combo_chart(
+        fig_proj = combo_chart_plotly(
             proj_for_chart,
             x_col="Year",
             bar_col="Revenue (₹)",
             line_col="EBITDA %",
-            title="Revenue + EBITDA% Projection (5 Years)"
+            title="Revenue + EBITDA% Projection (5 Years)",
+            line_suffix="%"
         )
-        st.pyplot(fig_proj)
+        st.plotly_chart(fig_proj, width="stretch")
 
         terminal = proj["Valuation (₹)"].iloc[-1]
         payout = terminal * equity
@@ -590,7 +582,7 @@ with tab3:
                 "EBITDA_Margin": "{:.1%}",
                 "YoY_Growth": "{:.1%}"
             }),
-            use_container_width=True
+            width="stretch"
         )
 
         fig_comp = px.bar(
@@ -601,8 +593,13 @@ with tab3:
             text="Revenue_Cr"
         )
         fig_comp.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig_comp.update_layout(yaxis_title="Revenue (₹ Cr)")
-        st.plotly_chart(fig_comp, use_container_width=True)
+        fig_comp.update_layout(
+            yaxis_title="Revenue (₹ Cr)",
+            xaxis_tickangle=-20,
+            template="plotly_white",
+            margin=dict(l=40, r=40, t=60, b=80)
+        )
+        st.plotly_chart(fig_comp, width="stretch")
 
         # =====================================================
         # AUTOMATED INSIGHTS
@@ -631,4 +628,3 @@ with tab3:
 
         for i in insights:
             st.markdown(f"<div class='card'>{i}</div>", unsafe_allow_html=True)
-

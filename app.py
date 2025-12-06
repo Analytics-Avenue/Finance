@@ -315,6 +315,63 @@ with tab3:
     st.markdown("<div class='section-title'>Step 2: Data Snapshot</div>", unsafe_allow_html=True)
     st.dataframe(df_rev.head(10), use_container_width=True)
 
+    # ----------------------------------------------
+    # REVENUE SPLITS + MOM / QOQ / YOY CALCULATIONS
+    # ----------------------------------------------
+    
+    # Ensure collected_amount exists
+    if "collected_amount" not in df.columns:
+        st.error("Your dataset does not have a 'collected_amount' column.")
+        st.stop()
+    
+    # Ensure date column is clean
+    df['first_payment_date'] = pd.to_datetime(df['first_payment_date'], errors='coerce')
+    df = df.dropna(subset=['first_payment_date'])
+    
+    # -----------------------------
+    # MONTHLY REVENUE
+    # -----------------------------
+    monthly = (
+        df.groupby(df['first_payment_date'].dt.to_period("M"))['collected_amount']
+        .sum()
+    )
+    monthly.index.name = "month_period"
+    
+    # -----------------------------
+    # QUARTERLY REVENUE
+    # -----------------------------
+    quarterly = (
+        df.groupby(df['first_payment_date'].dt.to_period("Q"))['collected_amount']
+        .sum()
+    )
+    quarterly.index.name = "quarter_period"
+    
+    # -----------------------------
+    # ANNUAL REVENUE
+    # -----------------------------
+    yearly = (
+        df.groupby(df['first_payment_date'].dt.year)['collected_amount']
+        .sum()
+    )
+    yearly.index.name = "year"
+    
+    # -----------------------------
+    # MoM Growth
+    # -----------------------------
+    mom = monthly.pct_change() * 100
+    mom.index.name = "month_period"
+    
+    # -----------------------------
+    # QoQ Growth
+    # -----------------------------
+    qoq = quarterly.pct_change() * 100
+    qoq.index.name = "quarter_period"
+    
+    # -----------------------------
+    # YoY Growth
+    # -----------------------------
+    yoy = yearly.pct_change() * 100
+    yoy.index.name = "year"
 
     # -----------------------------------------------------
     # CLEAN & ORDERED REVENUE + GROWTH ANALYTICS

@@ -8,9 +8,12 @@ import plotly.express as px
 # =========================================================
 # PAGE CONFIG
 # =========================================================
-st.set_page_config(page_title="EdTech Financial Intelligence Dashboard", layout="wide")
+st.set_page_config(
+    page_title="EdTech Financial Intelligence Dashboard",
+    layout="wide"
+)
 
-# Hide default Streamlit sidebar nav (optional)
+# Hide default sidebar (optional)
 st.markdown("""
 <style>
 [data-testid="stSidebarNav"] {display:none;}
@@ -89,7 +92,7 @@ body, [class*="css"] { color:#000 !important; font-size:16px; }
     box-shadow:0 12px 24px rgba(6,75,134,0.2);
 }
 
-/* Variable box */
+/* VARIABLE BOX */
 .variable-box {
     padding:12px;
     border-radius:10px;
@@ -112,49 +115,116 @@ body, [class*="css"] { color:#000 !important; font-size:16px; }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# COMBO CHART HELPER
+# COMBO CHART HELPER (RED/GREEN BARS + LABELS)
 # =========================================================
-def combo_chart(df, x_col, bar_col, line_col, title,
-                ylabel_bar="Value", ylabel_line="Percent"):
-    fig, ax1 = plt.subplots(figsize=(11, 5))
+def combo_chart(df, x_col, bar_col, line_col, title):
+    """
+    df      : DataFrame
+    x_col   : column for x-axis (categories)
+    bar_col : numeric column for bar values
+    line_col: numeric column for line values (typically %)
+    """
 
-    # Bar (left axis)
-    ax1.bar(
+    # Safety: handle empty or single-row df
+    if df.empty:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "No data", ha="center", va="center")
+        return fig
+
+    # Dynamic bar color based on positive/negative
+    colors = df[bar_col].apply(
+        lambda x: "#2ecc71" if x >= 0 else "#e74c3c"  # green / red
+    )
+
+    fig, ax1 = plt.subplots(figsize=(12, 5))
+
+    # --- BAR CHART (LEFT AXIS) ---
+    bars = ax1.bar(
         df[x_col],
         df[bar_col],
-        color="#064b86",
-        alpha=0.75,
+        color=colors,
+        alpha=0.85,
+        width=0.60,
         label=bar_col
     )
-    ax1.set_xlabel(x_col)
-    ax1.set_ylabel(ylabel_bar, color="#064b86")
-    ax1.tick_params(axis='y', labelcolor="#064b86")
-    ax1.grid(axis='y', alpha=0.25)
+    ax1.set_ylabel(bar_col, color="#000")
+    ax1.grid(axis="y", linestyle="--", alpha=0.3)
 
-    # Line (right axis)
+    # Offsets
+    max_bar = df[bar_col].max()
+    bar_offset = 0.02 * (max_bar if max_bar != 0 else 1)
+
+    # Add value labels above/below bars
+    for bar in bars:
+        height = bar.get_height()
+        if height >= 0:
+            y_pos = height + bar_offset
+            va = "bottom"
+        else:
+            y_pos = height - bar_offset
+            va = "top"
+        ax1.text(
+            bar.get_x() + bar.get_width() / 2,
+            y_pos,
+            f"{height:,.0f}",
+            ha="center",
+            va=va,
+            fontsize=9,
+            color="#000"
+        )
+
+    # --- LINE CHART (RIGHT AXIS) ---
     ax2 = ax1.twinx()
     ax2.plot(
         df[x_col],
         df[line_col],
-        color="red",
-        linewidth=2.5,
+        color="#2980b9",
         marker="o",
+        linewidth=2.5,
+        markersize=7,
         label=line_col
     )
-    ax2.set_ylabel(ylabel_line, color="red")
-    ax2.tick_params(axis='y', labelcolor="red")
+    ax2.set_ylabel(line_col, color="#2980b9")
+    ax2.tick_params(axis="y", labelcolor="#2980b9")
 
-    plt.title(title)
+    # Offset for line labels
+    max_line = np.nanmax(np.abs(df[line_col])) if len(df[line_col].dropna()) else 0
+    line_offset = 0.02 * (max_line if max_line != 0 else 1)
+
+    # Show line labels above/below points
+    for i, val in enumerate(df[line_col]):
+        if np.isnan(val):
+            continue
+        if val >= 0:
+            y_pos = val + line_offset
+            va = "bottom"
+        else:
+            y_pos = val - line_offset
+            va = "top"
+        ax2.text(
+            i,
+            y_pos,
+            f"{val:,.1f}%",
+            color="#2980b9",
+            ha="center",
+            va=va,
+            fontsize=9
+        )
+
+    # Title formatting
+    plt.title(title, fontsize=14, fontweight="bold")
+
+    # X-label rotation
     plt.xticks(rotation=45, ha="right")
 
+    fig.tight_layout()
     return fig
-
 
 # =========================================================
 # MAIN HEADER
 # =========================================================
 st.markdown("<div class='big-header'>EdTech Financial Intelligence Dashboard</div>", unsafe_allow_html=True)
-st.write("Track revenue, growth, and investor outcomes for your EdTech / Analytics business.")
+st.write("Upload your revenue data, track growth, and simulate investor outcomes for your EdTech / Analytics business.")
 
 # =========================================================
 # TABS
@@ -168,33 +238,32 @@ with tab1:
     st.markdown("<div class='section-title'>Overview</div>", unsafe_allow_html=True)
     st.markdown("""
     <div class="card">
-    This app helps you connect your student fee collection data to **financial insights**:
-    revenue trends, MoM / QoQ / YoY growth, 5-year projections, and simple investor valuation.
-    Use it to back your pitch decks, internal reviews, or to just see if the business isn't on fire.
+    This app connects your student fee collection data to **financial insights**:
+    revenue trends, MoM / QoQ / YoY growth, and a simple 5-year investor model with EBITDA, ROI, and IRR.
     </div>
     """, unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("<div class='section-title'>What You Can Do Here</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title'>What You Can Do</div>", unsafe_allow_html=True)
         st.markdown("""
         <div class="card">
-        • Upload revenue data from Google Sheets or CSV<br>
+        • Load data from Google Sheets or CSV<br>
         • See monthly, quarterly, annual revenue splits<br>
-        • Measure MoM, QoQ, YoY growth trends<br>
-        • Run a 5-year investor model (revenue + EBITDA)<br>
-        • Check basic investor outcomes: Terminal value, ROI, IRR<br>
-        • Compare your assumptions vs static EdTech benchmarks
+        • Calculate MoM, QoQ, YoY growth %<br>
+        • Run a 5-year projection (Revenue + EBITDA)<br>
+        • Calculate Terminal Value, ROI, IRR<br>
+        • Compare against static EdTech benchmarks
         </div>
         """, unsafe_allow_html=True)
     with c2:
-        st.markdown("<div class='section-title'>Who Is This For</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title'>Who It's For</div>", unsafe_allow_html=True)
         st.markdown("""
         <div class="card">
-        • Founders & co-founders in EdTech / Analytics<br>
-        • Finance / strategy / growth teams<br>
-        • Anyone building an investor deck with actual numbers<br>
-        • People who are tired of badly formatted Excel sheets
+        • Founders and finance leads in EdTech<br>
+        • Strategy & growth teams<br>
+        • Anyone prepping for investor meetings<br>
+        • People tired of 17 Excel sheets and no story
         </div>
         """, unsafe_allow_html=True)
 
@@ -214,14 +283,14 @@ with tab2:
     desc_map = {
         "first_payment_date": "First payment date from student (used for time-based grouping).",
         "collected_amount": "Amount actually collected from the student (₹).",
-        "total_fee": "Total fee agreed for that student/batch (optional for deal-size metrics).",
+        "total_fee": "Total fee agreed for that student/batch.",
         "joined_or_not": "Whether the student actually joined (Yes/No or 1/0).",
         "pay_status": "Payment status (Paid / Partially Paid / Pending).",
         "campaign_name": "Campaign/source attribution for marketing & CAC analysis.",
         "lead_created_date": "Date when lead was created.",
         "batch": "Batch ID/name to identify cohorts.",
         "pending_amount": "Fee still pending from that student (₹).",
-        "co_assignee": "Sales / coordinator responsible (for performance split)."
+        "co_assignee": "Sales/coordinator responsible (for performance splits)."
     }
 
     df_gloss = pd.DataFrame(
@@ -238,7 +307,7 @@ with tab2:
             "EBITDA & EBITDA Margin",
             "Net Profit & Net Margin",
             "MRR / ARR",
-            "Free Cash Flow",
+            "Free Cash Flow"
         ]:
             st.markdown(f"<div class='variable-box'>{m}</div>", unsafe_allow_html=True)
 
@@ -246,15 +315,15 @@ with tab2:
         st.markdown("<div class='section-title'>Investor & Growth Metrics</div>", unsafe_allow_html=True)
         for m in [
             "MoM / QoQ / YoY Growth",
-            "CAGR (Long-term growth)",
+            "CAGR (long-term growth)",
             "ROI (Return on Investment)",
             "IRR (Internal Rate of Return)",
-            "Terminal Value (EBITDA × multiple)",
+            "Terminal Value (EBITDA × Multiple)"
         ]:
             st.markdown(f"<div class='variable-box'>{m}</div>", unsafe_allow_html=True)
 
 # =========================================================
-# TAB 3 - APPLICATION (main logic)
+# TAB 3 - APPLICATION
 # =========================================================
 with tab3:
 
@@ -368,9 +437,7 @@ with tab3:
         x_col="month_period",
         bar_col="Revenue (₹)",
         line_col="MoM %",
-        title="Monthly Revenue + MoM Growth",
-        ylabel_bar="Revenue (₹)",
-        ylabel_line="MoM %"
+        title="Monthly Revenue + MoM Growth"
     )
     st.pyplot(fig_m)
 
@@ -393,9 +460,7 @@ with tab3:
         x_col="quarter_period",
         bar_col="Revenue (₹)",
         line_col="QoQ %",
-        title="Quarterly Revenue + QoQ Growth",
-        ylabel_bar="Revenue (₹)",
-        ylabel_line="QoQ %"
+        title="Quarterly Revenue + QoQ Growth"
     )
     st.pyplot(fig_q)
 
@@ -418,9 +483,7 @@ with tab3:
         x_col="year",
         bar_col="Revenue (₹)",
         line_col="YoY %",
-        title="Annual Revenue + YoY Growth",
-        ylabel_bar="Revenue (₹)",
-        ylabel_line="YoY %"
+        title="Annual Revenue + YoY Growth"
     )
     st.pyplot(fig_y)
 
@@ -475,14 +538,16 @@ with tab3:
         st.write("### 5-Year Projection (Table)")
         st.dataframe(proj.style.format("{:,.2f}"), use_container_width=True)
 
+        # For combo_chart, treat EBITDA as line (not % but still fine visually)
+        proj_for_chart = proj.copy()
+        proj_for_chart["EBITDA %"] = (proj_for_chart["EBITDA (₹)"] / proj_for_chart["Revenue (₹)"]) * 100
+
         fig_proj = combo_chart(
-            proj,
+            proj_for_chart,
             x_col="Year",
             bar_col="Revenue (₹)",
-            line_col="EBITDA (₹)",
-            title="Revenue + EBITDA Projection (5 Years)",
-            ylabel_bar="Revenue (₹)",
-            ylabel_line="EBITDA (₹)"
+            line_col="EBITDA %",
+            title="Revenue + EBITDA% Projection (5 Years)"
         )
         st.pyplot(fig_proj)
 
@@ -506,7 +571,7 @@ with tab3:
         competitors = pd.DataFrame({
             "Company": ["Your Org", "Scaler", "UpGrad", "Simplilearn", "Great Learning"],
             "Revenue_Cr": [
-                base_rev / 1e7,  # convert to Cr approx
+                base_rev / 1e7,  # approximate conversion
                 400, 1200, 600, 800
             ],
             "EBITDA_Margin": [

@@ -247,7 +247,7 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div class='section-title'>Key KPI Themes</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>KPIs</div>", unsafe_allow_html=True)
     k1, k2, k3, k4 = st.columns(4)
     k1.markdown("<div class='kpi'>Revenue & Growth</div>", unsafe_allow_html=True)
     k2.markdown("<div class='kpi'>Margins & EBITDA</div>", unsafe_allow_html=True)

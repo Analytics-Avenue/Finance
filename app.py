@@ -418,66 +418,55 @@ with tab3:
     # STEP 2 — FILTERS
     # =========================================================
     st.markdown("<div class='section-title'>Step 2: Filters</div>", unsafe_allow_html=True)
-
-    # ------------------------------
-    # Month Range Filter
-    # ------------------------------
-    st.markdown("### Filter by Month")
     
-    month_min = int(df["month"].min())
-    month_max = int(df["month"].max())
+    # Create 3 columns in one row
+    colM, colQ, colY = st.columns(3)
     
-    month_range = st.slider(
-        "Select Month Range:",
-        min_value=1,
-        max_value=12,
-        value=(month_min, month_max),
-        step=1
-    )
-    
-    df = df[(df["month"] >= month_range[0]) & (df["month"] <= month_range[1])]
-
-
-    # ------------------------------
-    # Quarter Range Filter
-    # ------------------------------
-    st.markdown("### Filter by Quarter")
-    
-    # Extract quarter number
-    df["quarter_num"] = df["quarter_period"].str[-1].astype(int)
-    
-    q_min = int(df["quarter_num"].min())
-    q_max = int(df["quarter_num"].max())
-    
-    quarter_range = st.slider(
-        "Select Quarter Range:",
-        min_value=1,
-        max_value=4,
-        value=(q_min, q_max),
-        step=1
-    )
-    
-    df = df[(df["quarter_num"] >= quarter_range[0]) & (df["quarter_num"] <= quarter_range[1])]
-
-    # ------------------------------
-    # Year Range Filter
-    # ------------------------------
-    st.markdown("### Filter by Year")
-
-    all_years = sorted(df["year"].unique())
-    if len(all_years) == 1:
-        year_range = (int(all_years[0]), int(all_years[0]))
-    else:
+    # -------------------- YEAR RANGE FILTER --------------------
+    with colY:
+        all_years = sorted(df["year"].unique())
+        year_min = int(min(all_years))
+        year_max = int(max(all_years))
         year_range = st.slider(
-            "Select Year Range:",
-            min_value=int(min(all_years)),
-            max_value=int(max(all_years)),
-            value=(int(min(all_years)), int(max(all_years)))
+            "Year Range",
+            min_value=year_min,
+            max_value=year_max,
+            value=(year_min, year_max)
         )
-
-    df = df[(df["year"] >= year_range[0]) & (df["year"] <= year_range[1])]
-
-
+        df = df[(df["year"] >= year_range[0]) & (df["year"] <= year_range[1])]
+    
+    # -------------------- MONTH RANGE FILTER --------------------
+    with colM:
+        month_min = int(df["month"].min())
+        month_max = int(df["month"].max())
+    
+        month_range = st.slider(
+            "Month Range",
+            min_value=1,
+            max_value=12,
+            value=(month_min, month_max)
+        )
+        df = df[(df["month"] >= month_range[0]) & (df["month"] <= month_range[1])]
+    
+    # -------------------- QUARTER RANGE FILTER --------------------
+    with colQ:
+        # Extract quarter number from your "2025Q1" format
+        df["quarter_num"] = df["quarter_period"].str[-1].astype(int)
+    
+        q_min = int(df["quarter_num"].min())
+        q_max = int(df["quarter_num"].max())
+    
+        quarter_range = st.slider(
+            "Quarter Range",
+            min_value=1,
+            max_value=4,
+            value=(q_min, q_max)
+        )
+        df = df[(df["quarter_num"] >= quarter_range[0]) & (df["quarter_num"] <= quarter_range[1])]
+    
+    # Cleanup
+    df.drop(columns=["quarter_num"], inplace=True, errors="ignore")
+    
     st.success(f"Filtered rows: {len(df)}")
     st.dataframe(df.head(), width="stretch")
 

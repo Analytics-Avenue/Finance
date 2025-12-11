@@ -419,19 +419,6 @@ with tab3:
     # =========================================================
     st.markdown("<div class='section-title'>Step 2: Filters</div>", unsafe_allow_html=True)
 
-    all_years = sorted(df["year"].unique())
-    if len(all_years) == 1:
-        year_range = (int(all_years[0]), int(all_years[0]))
-    else:
-        year_range = st.slider(
-            "Select Year Range:",
-            min_value=int(min(all_years)),
-            max_value=int(max(all_years)),
-            value=(int(min(all_years)), int(max(all_years)))
-        )
-
-    df = df[(df["year"] >= year_range[0]) & (df["year"] <= year_range[1])]
-
     # ------------------------------
     # Month Range Filter
     # ------------------------------
@@ -471,6 +458,25 @@ with tab3:
     )
     
     df = df[(df["quarter_num"] >= quarter_range[0]) & (df["quarter_num"] <= quarter_range[1])]
+
+    # ------------------------------
+    # Year Range Filter
+    # ------------------------------
+    st.markdown("### Filter by Year")
+
+    all_years = sorted(df["year"].unique())
+    if len(all_years) == 1:
+        year_range = (int(all_years[0]), int(all_years[0]))
+    else:
+        year_range = st.slider(
+            "Select Year Range:",
+            min_value=int(min(all_years)),
+            max_value=int(max(all_years)),
+            value=(int(min(all_years)), int(max(all_years)))
+        )
+
+    df = df[(df["year"] >= year_range[0]) & (df["year"] <= year_range[1])]
+
 
     st.success(f"Filtered rows: {len(df)}")
     st.dataframe(df.head(), width="stretch")

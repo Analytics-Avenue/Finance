@@ -432,6 +432,46 @@ with tab3:
 
     df = df[(df["year"] >= year_range[0]) & (df["year"] <= year_range[1])]
 
+    # ------------------------------
+    # Month Range Filter
+    # ------------------------------
+    st.markdown("### Filter by Month")
+    
+    month_min = int(df["month"].min())
+    month_max = int(df["month"].max())
+    
+    month_range = st.slider(
+        "Select Month Range:",
+        min_value=1,
+        max_value=12,
+        value=(month_min, month_max),
+        step=1
+    )
+    
+    df = df[(df["month"] >= month_range[0]) & (df["month"] <= month_range[1])]
+
+
+    # ------------------------------
+    # Quarter Range Filter
+    # ------------------------------
+    st.markdown("### Filter by Quarter")
+    
+    # Extract quarter number
+    df["quarter_num"] = df["quarter_period"].str[-1].astype(int)
+    
+    q_min = int(df["quarter_num"].min())
+    q_max = int(df["quarter_num"].max())
+    
+    quarter_range = st.slider(
+        "Select Quarter Range:",
+        min_value=1,
+        max_value=4,
+        value=(q_min, q_max),
+        step=1
+    )
+    
+    df = df[(df["quarter_num"] >= quarter_range[0]) & (df["quarter_num"] <= quarter_range[1])]
+
     st.success(f"Filtered rows: {len(df)}")
     st.dataframe(df.head(), width="stretch")
 
